@@ -1,6 +1,6 @@
 ---
 name: "admin-api"
-description: "Administre a Keycloak Admin REST API com operações seguras e rastreáveis. Use when você precisa consultar ou alterar realms, clients, usuários, roles, grupos, IdPs, Organizations ou fluxos."
+description: "Administer the Keycloak Admin REST API with safe, auditable operations. Use when you need to inspect or change realms, clients, users, roles, groups, IdPs, Organizations, or flows."
 license: "Apache-2.0"
 compatibility: "Kiro with the bundled keycloak-admin MCP server and a Keycloak service account"
 metadata:
@@ -11,47 +11,47 @@ metadata:
 # Keycloak Admin REST API
 
 ## Overview
-Esta skill opera a Admin REST API por meio das tools MCP do Power. O servidor autentica exclusivamente com Client Credentials Grant; a identidade é a service account do client configurado, portanto permissões e auditoria devem ser planejadas antes de qualquer mutação.
+This skill operates the Admin REST API through the Power's MCP tools. The server authenticates exclusively with Client Credentials Grant; the identity is the service account of the configured client, so permissions and auditing must be planned before any mutation.
 
 ## Prerequisites checklist
-- [ ] `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID` e `KEYCLOAK_CLIENT_SECRET` estão disponíveis ao processo MCP.
-- [ ] A service account tem apenas roles `realm-management` necessárias.
-- [ ] O operador confirmou realm, ambiente e impacto das alterações.
-- [ ] Para cada mutação, o plano com recurso alvo, campos alterados e impacto foi mostrado e recebeu confirmação humana explícita.
+- [ ] `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, and `KEYCLOAK_CLIENT_SECRET` are available to the MCP process.
+- [ ] The service account has only the necessary `realm-management` roles.
+- [ ] The operator confirmed realm, environment, and impact of the changes.
+- [ ] For every mutation, the plan with target resource, changed fields, and impact was shown and received explicit human confirmation.
 
 ## Step-by-step guide
 
-### Step 1 — Verificar a conexão e versão
-Chame `get_server_info` antes de administrar uma instância. Confirme a versão, providers instalados e se a instância possui o recurso Organizations quando ele for necessário. Um erro 401 normalmente indica client/secret/realm de autenticação incorreto; 403 indica role administrativa insuficiente.
+### Step 1 — Verify connectivity and version
+Call `get_server_info` before administering an instance. Confirm the version, installed providers, and whether the instance has the Organizations feature when it is needed. A 401 usually indicates an incorrect client/secret/authentication realm; 403 indicates insufficient administrative role.
 
-### Step 2 — Identificar o realm alvo
-Use `list_realms`, então consulte o realm desejado com `get_realm`. Trate o nome retornado como canônico: nomes de realm são case-sensitive. `KEYCLOAK_REALM` identifica onde a service account autentica; o parâmetro `realm` de cada tool identifica o recurso que será administrado.
+### Step 2 — Identify the target realm
+Use `list_realms`, then look up the desired realm with `get_realm`. Treat the returned name as canonical: realm names are case-sensitive. `KEYCLOAK_REALM` identifies where the service account authenticates; the `realm` parameter on each tool identifies the resource being administered.
 
-### Step 3 — Executar operações pelo domínio correto
-Depois de apresentar a mudança proposta e obter confirmação humana, use `create_realm` e `update_realm` para configurações de realm; `create_client` para clients; `create_user`, `assign_role_to_user` e `add_user_to_group` para identidades; e `create_identity_provider` para federação. Para endpoints detalhados consulte [realms](references/endpoints-realms.md), [users](references/endpoints-users.md), [clients](references/endpoints-clients.md), [roles e groups](references/endpoints-roles-groups.md), [IdPs](references/endpoints-idps.md), [Organizations](references/endpoints-organizations.md) e [flows](references/endpoints-auth-flows.md).
+### Step 3 — Run operations through the right domain
+After presenting the proposed change and getting human confirmation, use `create_realm` and `update_realm` for realm settings; `create_client` for clients; `create_user`, `assign_role_to_user`, and `add_user_to_group` for identities; and `create_identity_provider` for federation. For detailed endpoints, see [realms](references/endpoints-realms.md), [users](references/endpoints-users.md), [clients](references/endpoints-clients.md), [roles and groups](references/endpoints-roles-groups.md), [IdPs](references/endpoints-idps.md), [Organizations](references/endpoints-organizations.md), and [flows](references/endpoints-auth-flows.md).
 
-### Step 4 — Confirmar o resultado
-Após uma mutação, execute a tool de leitura correspondente: `get_realm`, `get_client`, `get_user`, `get_role`, `get_identity_provider` ou `get_organization`. Para alterações que afetam login, avalie eventos com `get_realm_events` e teste com uma conta não administrativa.
+### Step 4 — Confirm the result
+After a mutation, run the corresponding read tool: `get_realm`, `get_client`, `get_user`, `get_role`, `get_identity_provider`, or `get_organization`. For changes that affect login, review events with `get_realm_events` and test with a non-administrative account.
 
-### Step 5 — Excluir um realm de forma controlada
-Nunca trate um realm como recurso de limpeza automática. Leia-o com `get_realm`, apresente ao operador que serão removidos usuários, clients, chaves, sessões e configurações, e aguarde a confirmação humana nominal `DELETE <realm>`. Só então chame `delete_realm` com o mesmo `realm` e `confirmation`. O Power bloqueia a exclusão de `master`; qualquer alteração de alvo exige uma nova confirmação.
+### Step 5 — Delete a realm in a controlled way
+Never treat a realm as an automatic cleanup resource. Read it with `get_realm`, present to the operator that users, clients, keys, sessions, and configuration will be removed, and wait for the nominal human confirmation `DELETE <realm>`. Only then call `delete_realm` with the same `realm` and `confirmation`. The Power blocks deletion of `master`; any change of target requires a new confirmation.
 
-### Step 6 — Interpretar IDs corretamente
-Passe `clientId` humano para tools de client; o Power resolve o UUID interno automaticamente. `get_user`, `update_user` e `assign_role_to_user` aceitam UUID ou username exato. Group e Organization IDs são identificadores internos retornados nas listagens e devem ser preservados sem tentativa de inferência.
+### Step 6 — Interpret IDs correctly
+Pass the human `clientId` to client tools; the Power resolves the internal UUID automatically. `get_user`, `update_user`, and `assign_role_to_user` accept a UUID or an exact username. Group and Organization IDs are internal identifiers returned by listings and must be preserved without guessing.
 
 ## Common workflows
 
 ### Inventory read-only
-Use, em ordem, `get_server_info`, `list_realms`, `list_clients`, `list_users` e `list_identity_providers`. Evite buscar todos os usuários de grandes realms sem `search`, `max` e `first`.
+Use, in order, `get_server_info`, `list_realms`, `list_clients`, `list_users`, and `list_identity_providers`. Avoid fetching every user of large realms without `search`, `max`, and `first`.
 
 ### Controlled change
-Antes de alterar, registre a saída de `get_*`, apresente uma única mudança proposta e seu impacto, aguarde confirmação humana, aplique a operação, consulte novamente e acompanhe os eventos. Não combine uma alteração de redirect URI, roles e IdP em uma única sessão sem validação entre etapas. Uma confirmação anterior, genérica ou dada para outro alvo/payload não autoriza uma nova mutação.
+Before changing anything, record the output of `get_*`, present a single proposed change and its impact, wait for human confirmation, apply the operation, read again, and follow up on events. Do not combine a redirect URI change, roles, and an IdP in a single session without validating between steps. A prior, generic confirmation, or one given for another target/payload, does not authorize a new mutation.
 
 ## Important rules
-- **Antes de qualquer mutação, apresente ambiente, realm/recurso exato, operação, campos que mudarão e impacto; aguarde confirmação humana explícita.** Silêncio, pedido genérico ou aprovação para outro alvo/payload não autorizam a chamada.
-- Para `delete_realm`, a confirmação precisa ser exatamente `DELETE <realm>` e deve ser coletada imediatamente antes da exclusão.
-- Use somente Client Credentials Grant; Password Grant não é suportado nem deve ser introduzido.
-- Nunca exponha `KEYCLOAK_CLIENT_SECRET`, access tokens, refresh tokens ou secrets de clients em chat, commits ou logs.
-- Realm names são case-sensitive; `clientId` não é UUID.
-- Trate operações de delete e mudanças de login/redirect URI como impactantes em qualquer ambiente.
-- A API Keycloak autentica e emite claims; autorização de domínio SaaS continua sendo responsabilidade da aplicação.
+- **Before any mutation, present environment, exact realm/resource, operation, fields that will change, and impact; wait for explicit human confirmation.** Silence, a generic request, or approval for another target/payload do not authorize the call.
+- For `delete_realm`, the confirmation must be exactly `DELETE <realm>` and must be collected immediately before the deletion.
+- Use only Client Credentials Grant; Password Grant is not supported and must not be introduced.
+- Never expose `KEYCLOAK_CLIENT_SECRET`, access tokens, refresh tokens, or client secrets in chat, commits, or logs.
+- Realm names are case-sensitive; `clientId` is not a UUID.
+- Treat delete operations and login/redirect URI changes as impactful in any environment.
+- The Keycloak API authenticates and issues claims; SaaS-domain authorization remains the application's responsibility.

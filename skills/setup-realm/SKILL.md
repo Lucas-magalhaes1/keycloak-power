@@ -1,6 +1,6 @@
 ---
 name: "setup-realm"
-description: "Configure um realm Keycloak seguro para aplicações internas ou SaaS. Use when você precisa criar o limite de identidade de uma nova plataforma."
+description: "Configure a secure Keycloak realm for internal or SaaS applications. Use when you need to create the identity boundary for a new platform."
 license: "Apache-2.0"
 compatibility: "Keycloak 21+ and the keycloak-admin MCP server"
 metadata:
@@ -8,40 +8,40 @@ metadata:
   version: "1.0.0"
 ---
 
-# Criar e configurar um realm
+# Create and configure a realm
 
 ## Overview
-Um realm é um limite de identidade, login, usuários, clients e políticas. Escolha-o por domínio de confiança e ciclo de vida, não por cliente comercial. Para SaaS B2B/B2B2C, um realm único facilita SSO, governança de usuários e relações multi-tenant.
+A realm is an identity, login, user, client, and policy boundary. Choose it by trust domain and lifecycle, not by commercial customer. For B2B/B2B2C SaaS, a single realm makes SSO, user governance, and multi-tenant relationships easier.
 
 ## Prerequisites checklist
-- [ ] Nome estável, curto e em minúsculas foi definido.
-- [ ] Foi decidido se o caso é internal ou saas.
-- [ ] Existe uma service account com `manage-realm` no realm administrativo.
-- [ ] O realm, ambiente, configuração inicial e impacto foram apresentados; a criação recebeu confirmação humana explícita.
+- [ ] A stable, short, lowercase name has been defined.
+- [ ] It was decided whether the case is internal or SaaS.
+- [ ] There is a service account with `manage-realm` in the administrative realm.
+- [ ] The realm, environment, initial configuration, and impact were presented; creation received explicit human confirmation.
 
 ## Step-by-step guide
 
-### Step 1 — Definir nome e tipo
-Para plataforma interna, considere um realm como `workforce`; para produto SaaS, use um realm como `saas`. Defina separação por requisitos regulatórios, boundaries de confiança ou operações independentes, não por empresa compradora.
+### Step 1 — Define name and type
+For an internal platform, consider a realm like `workforce`; for a SaaS product, use a realm like `saas`. Define separation by regulatory requirements, trust boundaries, or independently operated environments, not by the buying company.
 
-### Step 2 — Criar o realm
-Antes de chamar `create_realm`, apresente realm, displayName, ambiente, `enabled`, `sslRequired` e qualquer campo em `config`, então aguarde confirmação humana explícita. Para produção, use `sslRequired: "external"` atrás de proxy TLS corretamente configurado ou `"all"` quando todo acesso deve ser HTTPS. `create_realm` habilita `bruteForceProtected: true` por padrão; definir `config.bruteForceProtected: false` é uma exceção de risco e requer justificativa e confirmação específica. Inclua `registrationAllowed`, `loginWithEmailAllowed` e temas apenas quando houver uma decisão explícita.
+### Step 2 — Create the realm
+Before calling `create_realm`, present realm, displayName, environment, `enabled`, `sslRequired`, and any field in `config`, then wait for explicit human confirmation. For production, use `sslRequired: "external"` behind a correctly configured TLS-terminating proxy, or `"all"` when all access must be HTTPS. `create_realm` enables `bruteForceProtected: true` by default; setting `config.bruteForceProtected: false` is a risk exception and requires justification and a specific confirmation. Include `registrationAllowed`, `loginWithEmailAllowed`, and themes only when there is an explicit decision.
 
-### Step 3 — Configurar login settings
-Use `get_realm`, depois apresente a alteração proposta e obtenha nova confirmação antes de usar `update_realm` para decidir auto-registro, recuperação de senha, login por email, verificação de email, brute-force detection, sessão SSO e required actions. Evite ativar auto-registro público sem verificação de email, limites de abuso e fluxo de onboarding.
+### Step 3 — Configure login settings
+Use `get_realm`, then present the proposed change and get a new confirmation before using `update_realm` to decide self-registration, password recovery, login by email, email verification, brute-force detection, SSO session, and required actions. Avoid enabling public self-registration without email verification, abuse limits, and an onboarding flow.
 
-### Step 4 — Configurar SSL e segurança
-Mantenha TLS fim a fim ou configure corretamente headers de proxy no servidor Keycloak. Defina duração de access token de acordo com o risco, habilite proteção contra força bruta e limite redirect URIs no nível de client. Não use curingas amplos como `*` em redirect URIs ou web origins.
+### Step 4 — Configure SSL and security
+Keep end-to-end TLS or correctly configure proxy headers on the Keycloak server. Set access token lifetime according to risk, enable brute-force protection, and restrict redirect URIs at the client level. Do not use broad wildcards like `*` in redirect URIs or web origins.
 
-### Step 5 — Criar o primeiro client administrado
-Prossiga com `setup-client`: antes de criar clients ou roles, mostre os valores propostos e obtenha confirmação humana específica. Um realm sem client pode ser administrado, mas não atende aplicações.
+### Step 5 — Create the first managed client
+Continue with `setup-client`: before creating clients or roles, show the proposed values and get a specific human confirmation. A realm without a client can be administered but does not serve applications.
 
 ## Verification
-Use `get_realm` e confira `enabled`, `sslRequired`, `bruteForceProtected: true`, configurações de login e atributos. Em seguida use `get_token_endpoint_info` para conferir o issuer e os endpoints que a aplicação consumirá. Veja o checklist completo em [realm-best-practices.md](references/realm-best-practices.md).
+Use `get_realm` and check `enabled`, `sslRequired`, `bruteForceProtected: true`, login settings, and attributes. Then use `get_token_endpoint_info` to check the issuer and endpoints the application will consume. See the full checklist in [realm-best-practices.md](references/realm-best-practices.md).
 
 ## Important rules
-- **Antes de qualquer mutação, apresente ambiente, realm/recurso exato, operação, campos que mudarão e impacto; aguarde confirmação humana explícita.** Uma confirmação anterior, genérica ou para outro alvo/payload não autoriza a chamada.
-- **Não crie um realm por cliente SaaS.** Use um realm `saas` e Organizations, groups ou dados de domínio para segmentação.
-- Use realm por cliente apenas quando houver boundary real de confiança, administração, compliance ou residência de dados que exija isolamento completo.
-- Nunca desabilite SSL para compensar configuração de proxy incorreta.
-- Não teste mudanças de browser flow diretamente no fluxo administrativo sem uma rota de recuperação.
+- **Before any mutation, present environment, exact realm/resource, operation, fields that will change, and impact; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target/payload, does not authorize the call.
+- **Do not create a realm per SaaS customer.** Use a `saas` realm and Organizations, groups, or domain data for segmentation.
+- Use realm-per-customer only when there is a real trust, administration, compliance, or data-residency boundary that requires full isolation.
+- Never disable SSL to work around incorrect proxy configuration.
+- Do not test browser flow changes directly in the administrative flow without a recovery route.

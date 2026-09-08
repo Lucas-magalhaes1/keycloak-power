@@ -1,6 +1,6 @@
 ---
 name: "identity-providers"
-description: "Integre provedores externos de identidade ao Keycloak com OIDC ou SAML. Use when você precisa federar Google, Entra ID, Okta ou um IdP corporativo."
+description: "Integrate external identity providers into Keycloak with OIDC or SAML. Use when you need to federate Google, Entra ID, Okta, or a corporate IdP."
 license: "Apache-2.0"
 compatibility: "Keycloak 21+ and the keycloak-admin MCP server"
 metadata:
@@ -8,43 +8,43 @@ metadata:
   version: "1.0.0"
 ---
 
-# Configurar identity providers externos
+# Configure external identity providers
 
 ## Overview
-Um Identity Provider (IdP) faz o Keycloak confiar no login de um provedor externo e emitir seus próprios tokens para os clients locais. O realm continua dono do contrato de claims e da política de sessão, independentemente do provedor upstream.
+An Identity Provider (IdP) makes Keycloak trust login from an external provider and issue its own tokens to local clients. The realm remains the owner of the claim contract and session policy regardless of the upstream provider.
 
 ## Prerequisites checklist
-- [ ] O IdP externo foi registrado com redirect URI do broker Keycloak.
-- [ ] Client ID, client secret, issuer/metadata e escopos foram armazenados em cofre.
-- [ ] O alias do IdP, mapeamento de identidade e comportamento de primeiro login foram definidos.
+- [ ] The external IdP has been registered with the Keycloak broker's redirect URI.
+- [ ] Client ID, client secret, issuer/metadata, and scopes are stored in a vault.
+- [ ] The IdP alias, identity mapping, and first-login behavior have been defined.
 
 ## Step-by-step guide
 
-### Step 1 — Obter credenciais no IdP
-Registre Keycloak como relying party/client no provider e copie somente os valores necessários: issuer ou metadata URL, client ID, secret/certificado e redirect URI. A callback normalmente é `https://<keycloak>/realms/<realm>/broker/<alias>/endpoint`; confira a URL exibida pelo Keycloak para o alias final.
+### Step 1 — Obtain credentials at the IdP
+Register Keycloak as a relying party/client at the provider and copy only the necessary values: issuer or metadata URL, client ID, secret/certificate, and redirect URI. The callback is normally `https://<keycloak>/realms/<realm>/broker/<alias>/endpoint`; check the URL Keycloak displays for the final alias.
 
-### Step 2 — Criar o IdP no Keycloak
-Use `create_identity_provider` com alias, `providerId`, displayName e config. Os provider IDs suportados pelo Power são `google`, `microsoft`, `oidc`, `saml` e `keycloak-oidc`. Antes de gravar, confira que os endpoints/metadata pertencem ao tenant correto e que a validação de assinatura não foi desabilitada.
+### Step 2 — Create the IdP in Keycloak
+Use `create_identity_provider` with alias, `providerId`, displayName, and config. The provider IDs supported by the Power are `google`, `microsoft`, `oidc`, `saml`, and `keycloak-oidc`. Before saving, check that the endpoints/metadata belong to the correct tenant and that signature validation has not been disabled.
 
-### Step 3 — Configurar mappers de claims
-Mapeie identificadores estáveis e atributos mínimos. O email só é identificador confiável se for verificado e imutável segundo a política do provider; prefira `sub`/subject externo para ligação de conta. Configure first login flow para exigir confirmação ou vinculação quando necessário.
+### Step 3 — Configure claim mappers
+Map stable identifiers and minimal attributes. Email is only a trustworthy identifier if it is verified and immutable under the provider's policy; prefer the external `sub`/subject for account linking. Configure the first-login flow to require confirmation or linking when needed.
 
-### Step 4 — Testar autenticação
-Use uma conta de teste, complete o login no IdP e valide usuário e sessão com `get_user`, `get_user_sessions` e `get_realm_events`. Decodifique o token local emitido pelo Keycloak com `decode_token`; a aplicação deve confiar no issuer do Keycloak, não no token upstream.
+### Step 4 — Test authentication
+Use a test account, complete login at the IdP, and validate the user and session with `get_user`, `get_user_sessions`, and `get_realm_events`. Decode the local token issued by Keycloak with `decode_token`; the application should trust Keycloak's issuer, not the upstream token.
 
-### Step 5 — Vincular a uma Organization quando aplicável
-Em B2B, crie a Organization com `create_organization`, então use `add_idp_to_organization` para associar o alias já existente. Teste a descoberta por domínio e o fluxo de broker com usuário daquele cliente.
+### Step 5 — Link to an Organization when applicable
+For B2B, create the Organization with `create_organization`, then use `add_idp_to_organization` to associate the existing alias. Test domain discovery and the broker flow with a user from that customer.
 
 ## Provider references
 - [Google](references/google-setup.md)
 - [Microsoft Entra ID](references/microsoft-entra-id-setup.md)
-- [OIDC genérico](references/oidc-generic-setup.md)
-- [SAML genérico](references/saml-generic-setup.md)
+- [Generic OIDC](references/oidc-generic-setup.md)
+- [Generic SAML](references/saml-generic-setup.md)
 - [Okta](references/okta-setup.md)
 
 ## Important rules
-- **Antes de criar, atualizar, vincular ou remover um IdP, apresente realm, alias, issuer/metadata, campos alterados e impacto no login; aguarde confirmação humana explícita.** Uma aprovação anterior, genérica ou para outro alvo não autoriza a alteração.
-- Nunca cole segredos, private keys, SAML assertions ou tokens no chat.
-- Valide issuer, discovery/metadata URL, assinatura e audience; não aceite endpoints descobertos a partir de input do usuário.
-- Use alias estável; trocá-lo quebra URLs de broker e associações de Organization.
-- O IdP autentica usuários; as roles e permissões do produto devem ser atribuídas e avaliadas segundo políticas do realm e da aplicação.
+- **Before creating, updating, linking, or removing an IdP, present realm, alias, issuer/metadata, changed fields, and login impact; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- Never paste secrets, private keys, SAML assertions, or tokens into chat.
+- Validate issuer, discovery/metadata URL, signature, and audience; do not accept endpoints discovered from user input.
+- Use a stable alias; changing it breaks broker URLs and Organization associations.
+- The IdP authenticates users; product roles and permissions must be assigned and evaluated according to realm and application policies.

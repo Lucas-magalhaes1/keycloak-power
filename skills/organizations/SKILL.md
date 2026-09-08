@@ -1,6 +1,6 @@
 ---
 name: "organizations"
-description: "Implemente multi-tenancy B2B com Keycloak Organizations 26+. Use when um SaaS precisa agrupar membros, domínios e IdPs de empresas clientes."
+description: "Implement B2B multi-tenancy with Keycloak 26+ Organizations. Use when a SaaS product needs to group members, domains, and IdPs of customer companies."
 license: "Apache-2.0"
 compatibility: "Keycloak 26+ with Organizations enabled and the keycloak-admin MCP server"
 metadata:
@@ -8,40 +8,40 @@ metadata:
   version: "1.0.0"
 ---
 
-# Multi-tenancy com Organizations
+# Multi-tenancy with Organizations
 
 ## Overview
-Organizations modelam organizações clientes e suas memberships dentro de um único realm. Elas ajudam a conduzir onboarding B2B, descoberta de login por domínio e associação de identity providers, mas não substituem o modelo de autorização de recursos do SaaS.
+Organizations model customer companies and their memberships inside a single realm. They help drive B2B onboarding, login discovery by domain, and identity provider association, but they do not replace the SaaS resource authorization model.
 
 ## Prerequisites checklist
-- [ ] `get_server_info` confirma Keycloak 26+.
-- [ ] Organizations está habilitado no profile/configuração do servidor.
-- [ ] O realm SaaS e o alias estável de cada organização foram definidos.
-- [ ] A aplicação possui modelo próprio de tenant, membership e autorização de dados.
+- [ ] `get_server_info` confirms Keycloak 26+.
+- [ ] Organizations is enabled in the server's profile/configuration.
+- [ ] The SaaS realm and the stable alias of each organization have been defined.
+- [ ] The application has its own tenant, membership, and authorization model.
 
 ## Step-by-step guide
 
-### Step 1 — Habilitar e confirmar Organizations
-Ative a feature no servidor conforme a distribuição Keycloak usada e reinicie/implante quando requerido. Depois chame `list_organizations`; se receber 404, confirme versão, feature profile, URL base e permissões administrativas.
+### Step 1 — Enable and confirm Organizations
+Enable the feature according to the Keycloak distribution used and restart/redeploy when required. Then call `list_organizations`; if you get a 404, check version, feature profile, base URL, and administrative permissions.
 
-### Step 2 — Criar a Organization
-Use `create_organization` com `name`, alias, domains e attributes. O alias deve ser estável e seguro para URLs; o nome pode mudar. Domínios são candidatos de descoberta e precisam de política/verificação antes de serem tratados como prova de posse.
+### Step 2 — Create the Organization
+Before creating, present realm, organization name/alias, and impact; wait for explicit human confirmation. Then use `create_organization` with `name`, alias, domains, and attributes. The alias must be stable and URL-safe; the name can change. Domains are discovery candidates and need policy/verification before being treated as proof of ownership.
 
-### Step 3 — Configurar domains
-Inclua somente domínios corporativos que pertencem ao tenant. Não determine tenant apenas pelo sufixo de email na API: aliases, usuários convidados e domínios compartilhados exigem uma decisão de negócio adicional. Consulte [org-concepts.md](references/org-concepts.md).
+### Step 3 — Configure domains
+Include only corporate domains that belong to the tenant. Do not determine tenant solely by email suffix in the API: aliases, invited users, and shared domains require an additional business decision. See [org-concepts.md](references/org-concepts.md).
 
-### Step 4 — Adicionar membros
-Crie ou localize pessoas com `create_user`/`get_user`, então chame `add_member_to_organization`. Confirme a associação com `list_organization_members`. A membership Keycloak não deve ser interpretada automaticamente como permissão para todos os recursos do cliente.
+### Step 4 — Add members
+Create or find people with `create_user`/`get_user`, then call `add_member_to_organization` after presenting the target and getting confirmation. Confirm the association with `list_organization_members`. Keycloak membership should not be automatically interpreted as permission for all of the customer's resources.
 
-### Step 5 — Vincular IdP à Organization
-Crie o IdP com `create_identity_provider`, verifique com `get_identity_provider` e associe o alias via `add_idp_to_organization`. Teste o broker com uma conta do IdP antes de ativar descoberta automática para usuários reais.
+### Step 5 — Link an IdP to the Organization
+Create the IdP with `create_identity_provider`, verify it with `get_identity_provider`, and associate the alias via `add_idp_to_organization` after confirmation. Test the broker with an account from the IdP before enabling automatic discovery for real users.
 
-### Step 6 — Configurar Organization Groups
-Use groups do Keycloak para coortes de identidade quando necessário, por exemplo `org/acme/admins`, mas mantenha atribuição de recursos e delegações complexas no banco/política do SaaS. Consulte [multi-tenant-patterns.md](references/multi-tenant-patterns.md).
+### Step 6 — Configure Organization Groups
+Use Keycloak groups for identity cohorts when needed, for example `org/acme/admins`, but keep resource assignment and complex delegations in the SaaS database/policy. See [multi-tenant-patterns.md](references/multi-tenant-patterns.md).
 
 ## Important rules
-- **Antes de criar uma Organization ou alterar domínios, memberships ou IdPs vinculados, apresente realm, organização/alias, recurso alvo e impacto; aguarde confirmação humana explícita.** Uma aprovação anterior, genérica ou para outro alvo não autoriza a alteração.
-- Use **um realm único `saas`**, não um realm por cliente, para o padrão SaaS normal.
-- Organizations são recurso de CIAM/onboarding; elas não são um banco de ACLs de recursos da aplicação.
-- Um usuário pode participar de múltiplas organizações/tenants; não assuma um único `tenant_id` sem contexto de sessão ou seleção explícita.
-- Verifique domínio e IdP antes de usar sua associação como sinal de pertencimento corporativo.
+- **Before creating an Organization or changing domains, memberships, or linked IdPs, present realm, organization/alias, target resource, and impact; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- Use a **single `saas` realm**, not a realm per customer, for the standard SaaS pattern.
+- Organizations are a CIAM/onboarding resource; they are not an application resource ACL database.
+- A user may participate in multiple organizations/tenants; do not assume a single `tenant_id` without session context or explicit selection.
+- Verify domain and IdP before using their association as a signal of corporate membership.

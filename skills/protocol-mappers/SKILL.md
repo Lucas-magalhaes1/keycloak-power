@@ -1,6 +1,6 @@
 ---
 name: "protocol-mappers"
-description: "Projete protocol mappers do Keycloak para claims JWT e SAML úteis e mínimos. Use when uma aplicação precisa receber atributos, groups, audiences ou contexto de tenant."
+description: "Design Keycloak protocol mappers for useful and minimal JWT and SAML claims. Use when an application needs to receive attributes, groups, audiences, or tenant context."
 license: "Apache-2.0"
 compatibility: "Keycloak 21+ and the keycloak-admin MCP server"
 metadata:
@@ -8,36 +8,36 @@ metadata:
   version: "1.0.0"
 ---
 
-# Protocol mappers e claims
+# Protocol mappers and claims
 
 ## Overview
-Protocol mappers transformam identidade Keycloak em claims que clients consomem. Eles são a ponte entre autenticação e uma API SaaS, portanto devem ser versionados como contrato: claim estável, tipo explícito, audiência correta e mínima exposição de dados.
+Protocol mappers transform Keycloak identity into claims that clients consume. They are the bridge between authentication and a SaaS API, so they should be versioned as a contract: stable claim, explicit type, correct audience, and minimal data exposure.
 
 ## Prerequisites checklist
-- [ ] A API documentou claims, tipos e consumidores.
-- [ ] O client ou client scope alvo foi identificado.
-- [ ] Foi decidido se o mapper aparece em access token, ID token e/ou userinfo.
+- [ ] The API has documented claims, types, and consumers.
+- [ ] The target client or client scope has been identified.
+- [ ] It has been decided whether the mapper appears in the access token, ID token, and/or userinfo.
 
 ## Step-by-step guide
 
-### Step 1 — Inspecionar mappers atuais
-Use `list_protocol_mappers` com realm e clientId. Identifique mappers duplicados, claims com mesmo nome e mappers herdados de client scopes. Use `get_default_client_scopes` para descobrir o que é aplicado globalmente.
+### Step 1 — Inspect current mappers
+Use `list_protocol_mappers` with realm and clientId. Identify duplicate mappers, claims with the same name, and mappers inherited from client scopes. Use `get_default_client_scopes` to discover what is applied globally.
 
-### Step 2 — Escolher tipo de mapper
-Use User Attribute para atributo controlado, Group Membership para coortes, User Realm Role/Client Role para roles, Audience para `aud`, e hardcoded claim apenas para metadado não sensível. Veja [built-in-mappers.md](references/built-in-mappers.md).
+### Step 2 — Choose the mapper type
+Use User Attribute for a controlled attribute, Group Membership for cohorts, User Realm Role/Client Role for roles, Audience for `aud`, and hardcoded claim only for non-sensitive metadata. See [built-in-mappers.md](references/built-in-mappers.md).
 
-### Step 3 — Criar mapper customizado
-Use `create_protocol_mapper` com `protocol: "openid-connect"`, provider ID correto e `config`. Para `tenant_id` armazenado em atributo de usuário, um `oidc-usermodel-attribute-mapper` deve definir `user.attribute`, `claim.name`, `jsonType.label`, e flags de inclusão. Para Organization, prefira dados de contexto da aplicação quando um usuário pode participar de múltiplos tenants.
+### Step 3 — Create a custom mapper
+Before creating or changing a mapper, present realm, client, claim, provider, affected tokens, and impact on the API contract; wait for explicit human confirmation. Then use `create_protocol_mapper` with `protocol: "openid-connect"`, the correct provider ID, and `config`. For `tenant_id` stored in a user attribute, an `oidc-usermodel-attribute-mapper` should set `user.attribute`, `claim.name`, `jsonType.label`, and inclusion flags. For Organization data, prefer application-context data when a user can belong to multiple tenants.
 
-### Step 4 — Verificar token novo
-Obtenha novo token e use `decode_token`. Confirme tipo do JSON, nome, audience e presença somente no token desejado. Mudanças em mapper não alteram tokens emitidos anteriormente.
+### Step 4 — Verify with a new token
+Obtain a new token and use `decode_token`. Confirm JSON type, name, audience, and presence only in the intended token. Mapper changes do not alter previously issued tokens.
 
 ## References
-Leia [custom-mappers.md](references/custom-mappers.md) para configurações práticas e [multi-tenant-claims.md](references/multi-tenant-claims.md) para `tenant_id`, `org_id` e `membership_type`.
+Read [custom-mappers.md](references/custom-mappers.md) for practical configurations and [multi-tenant-claims.md](references/multi-tenant-claims.md) for `tenant_id`, `org_id`, and `membership_type`.
 
 ## Important rules
-- **Antes de criar ou alterar um mapper, apresente realm, client, claim, provider, tokens afetados e impacto no contrato da API; aguarde confirmação humana explícita.** Uma aprovação anterior, genérica ou para outro alvo não autoriza a alteração.
-- **Mappers são a ponte entre Keycloak e a API SaaS**; mudanças quebram contratos de autorização.
-- Não coloque ACLs completas, listas grandes de recursos ou dados sensíveis no JWT.
-- `tenant_id` único é inseguro quando o usuário tem múltiplas memberships sem tenant ativo explícito.
-- Toda API ainda deve validar issuer, signature, audience e exp antes de confiar em claims.
+- **Before creating or changing a mapper, present realm, client, claim, provider, affected tokens, and impact on the API contract; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- **Mappers are the bridge between Keycloak and the SaaS API**; changes break authorization contracts.
+- Do not put full ACLs, large resource lists, or sensitive data in the JWT.
+- A single `tenant_id` is unsafe when the user has multiple memberships without an explicit active tenant.
+- Every API must still validate issuer, signature, audience, and exp before trusting claims.

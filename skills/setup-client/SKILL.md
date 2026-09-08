@@ -1,6 +1,6 @@
 ---
 name: "setup-client"
-description: "Configure clients OIDC e SAML do Keycloak com grants e URIs seguros. Use when você está integrando SPA, backend, mobile ou service-to-service."
+description: "Configure Keycloak OIDC and SAML clients with secure grants and URIs. Use when you are integrating an SPA, backend, mobile app, or service-to-service workload."
 license: "Apache-2.0"
 compatibility: "Keycloak 21+ and the keycloak-admin MCP server"
 metadata:
@@ -8,39 +8,39 @@ metadata:
   version: "1.0.0"
 ---
 
-# Configurar um client OIDC ou SAML
+# Configure an OIDC or SAML client
 
 ## Overview
-Clients representam aplicações que delegam autenticação ao Keycloak. A seleção de protocolo, grant e tipo público/confidencial determina onde o token é emitido e quais segredos podem existir com segurança.
+Clients represent applications that delegate authentication to Keycloak. The choice of protocol, grant, and public/confidential type determines where the token is issued and which secrets can safely exist.
 
 ## Prerequisites checklist
-- [ ] URLs de produção, homologação e desenvolvimento estão inventariadas.
-- [ ] O tipo de aplicação e a capacidade de guardar segredo foram identificados.
-- [ ] Redirect URIs e web origins foram aprovados sem curingas amplos.
+- [ ] Production, staging, and development URLs are inventoried.
+- [ ] The application type and its ability to keep a secret have been identified.
+- [ ] Redirect URIs and web origins have been approved without broad wildcards.
 
 ## Step-by-step guide
 
-### Step 1 — Identificar o tipo de aplicação
-SPA e mobile são public clients: não mantêm client secret. Backend web e serviços machine-to-machine são confidential clients. Para SSO corporativo legado, identifique se o service provider exige SAML e obtenha metadata/ACS URL antes de criar o client.
+### Step 1 — Identify the application type
+SPAs and mobile apps are public clients: they do not keep a client secret. Web backends and machine-to-machine services are confidential clients. For legacy enterprise SSO, identify whether the service provider requires SAML and obtain metadata/ACS URL before creating the client.
 
-### Step 2 — Escolher o grant type
-Para browsers, escolha Authorization Code com PKCE. Para comunicação serviço a serviço, habilite Client Credentials e use service accounts. Device Authorization serve dispositivos sem browser completo. Não use Implicit em novas integrações; ele expõe tokens ao front channel. Veja [oidc-patterns.md](references/oidc-patterns.md).
+### Step 2 — Choose the grant type
+For browsers, choose Authorization Code with PKCE. For service-to-service communication, enable Client Credentials and use service accounts. Device Authorization serves devices without a full browser. Do not use Implicit in new integrations; it exposes tokens to the front channel. See [oidc-patterns.md](references/oidc-patterns.md).
 
-### Step 3 — Criar o client
-Use `create_client` com `protocol: "openid-connect"` ou `"saml"`, `publicClient`, `redirectUris`, `webOrigins` e `config`. Para SPA OIDC, configure `standardFlowEnabled: true`, PKCE `S256` nos atributos, redirect URIs exatas e origins explícitas. Para backend, mantenha `publicClient: false` e crie/roteie o secret para um cofre.
+### Step 3 — Create the client
+Before creating or changing a client, present realm, clientId, protocol, grants, public/confidential type, redirect URIs, origins, and claims; wait for explicit human confirmation. Then use `create_client` with `protocol: "openid-connect"` or `"saml"`, `publicClient`, `redirectUris`, `webOrigins`, and `config`. For an OIDC SPA, configure `standardFlowEnabled: true`, PKCE `S256` in attributes, exact redirect URIs, and explicit origins. For a backend, keep `publicClient: false` and create/route the secret to a vault.
 
-### Step 4 — Configurar redirect URIs e origins
-Uma redirect URI deve conter esquema, host, porta e path esperados. Adicione cada callback real, como `https://portal.example.com/auth/callback`, e evite `https://*.example.com/*`. Em SPA, `webOrigins` deve conter somente origins que farão CORS; não use `+` ou `*` como atalho de segurança.
+### Step 4 — Configure redirect URIs and origins
+A redirect URI must contain the expected scheme, host, port, and path. Add each real callback, such as `https://portal.example.com/auth/callback`, and avoid `https://*.example.com/*`. For an SPA, `webOrigins` must contain only origins that will perform CORS; do not use `+` or `*` as a security shortcut.
 
-### Step 5 — Adicionar claims necessários
-Use `list_protocol_mappers` para inspecionar o que já chega ao token e `create_protocol_mapper` para atributos, groups, audience ou roles adicionais. Após obter um token de teste, valide com `decode_token`. Para SAML, consulte [saml-patterns.md](references/saml-patterns.md).
+### Step 5 — Add required claims
+Use `list_protocol_mappers` to inspect what already reaches the token and `create_protocol_mapper` for additional attributes, groups, audience, or roles. After obtaining a test token, validate it with `decode_token`. For SAML, see [saml-patterns.md](references/saml-patterns.md).
 
 ## Verification
-Use `get_client` para conferir a representação efetiva. Teste Authorization Code no navegador com uma URI permitida e uma URI negada. Para confidential clients, use o token endpoint apenas a partir de ambiente servidor e confirme que tokens contêm `aud` adequado.
+Use `get_client` to check the effective representation. Test Authorization Code in the browser with an allowed URI and a denied URI. For confidential clients, use the token endpoint only from a server environment and confirm tokens contain the correct `aud`.
 
 ## Important rules
-- **Antes de criar ou alterar um client, apresente realm, clientId, protocolo, grants, tipo público/confidencial, redirect URIs, origins e claims; aguarde confirmação humana explícita.** Uma aprovação anterior, genérica ou para outro alvo não autoriza a alteração.
-- SPA e aplicativos mobile nunca devem receber nem armazenar `KEYCLOAK_CLIENT_SECRET`.
-- Authorization Code + PKCE é o padrão para apps interativos modernos.
-- Client Credentials identifica uma aplicação/service account, não um usuário humano.
-- Mappers determinam a superfície de claims; adicione somente dados necessários e evite dados pessoais desnecessários.
+- **Before creating or changing a client, present realm, clientId, protocol, grants, public/confidential type, redirect URIs, origins, and claims; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- SPAs and mobile apps must never receive or store `KEYCLOAK_CLIENT_SECRET`.
+- Authorization Code + PKCE is the default for modern interactive apps.
+- Client Credentials identifies an application/service account, not a human user.
+- Mappers determine the claim surface; add only necessary data and avoid unnecessary personal data.

@@ -99,19 +99,19 @@ Tool inputs are validated for required strings and JSON-shaped configuration val
 ## Example Kiro conversations
 
 ```text
-Liste os clients do realm saas e mostre os redirect URIs do portal-web.
+List the clients in the saas realm and show the redirect URIs for portal-web.
 ```
 
 ```text
-Crie a organização acme com alias acme, domínio acme.example e adicione alice.
+Create the acme organization with alias acme, domain acme.example, and add alice as a member.
 ```
 
 ```text
-Decodifique este JWT e explique por que a API não recebe o claim tenant_id.
+Decode this JWT and explain why the API isn't receiving the tenant_id claim.
 ```
 
 ```text
-Quero um client para uma SPA. Use Authorization Code com PKCE, origens seguras e um mapper de grupos.
+I need a client for an SPA. Use Authorization Code with PKCE, safe origins, and a groups mapper.
 ```
 
 ## Development

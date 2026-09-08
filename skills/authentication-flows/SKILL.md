@@ -1,6 +1,6 @@
 ---
 name: "authentication-flows"
-description: "Configure authentication flows, ações obrigatórias e MFA no Keycloak. Use when você precisa revisar login, OTP, WebAuthn ou fluxos customizados."
+description: "Configure authentication flows, required actions, and MFA in Keycloak. Use when you need to review login, OTP, WebAuthn, or custom flows."
 license: "Apache-2.0"
 compatibility: "Keycloak 21+ and the keycloak-admin MCP server"
 metadata:
@@ -8,36 +8,36 @@ metadata:
   version: "1.0.0"
 ---
 
-# Authentication flows e MFA
+# Authentication flows and MFA
 
 ## Overview
-Authentication flows determinam como o Keycloak autentica, desafia e recupera usuários. Eles têm alto impacto operacional: uma execução `REQUIRED` incorreta pode bloquear todo login, inclusive o de administradores.
+Authentication flows determine how Keycloak authenticates, challenges, and recovers users. They have high operational impact: an incorrect `REQUIRED` execution can lock out every login, including administrators.
 
 ## Prerequisites checklist
-- [ ] Um usuário de teste e uma rota de administração de recuperação estão disponíveis.
-- [ ] O flow alvo e sua associação (browser, direct grant, registration, reset credentials) foram identificados.
-- [ ] A política de MFA define quem deve usar OTP ou WebAuthn e como ocorre recovery.
+- [ ] A test user and an administrative recovery route are available.
+- [ ] The target flow and its binding (browser, direct grant, registration, reset credentials) have been identified.
+- [ ] The MFA policy defines who must use OTP or WebAuthn and how recovery works.
 
 ## Step-by-step guide
 
-### Step 1 — Listar flows
-Chame `list_auth_flows` e registre alias, descrição e built-in. Flows built-in não devem ser editados diretamente; crie uma cópia no Admin Console/API antes de personalizar e só então faça o binding do novo flow.
+### Step 1 — List flows
+Call `list_auth_flows` and record alias, description, and built-in status. Built-in flows should not be edited directly; create a copy in the Admin Console/API before customizing, and only then bind the new flow.
 
-### Step 2 — Entender o flow selecionado
-Use `get_auth_flow` com o alias. Examine a ordem das executions e seus requisitos (`REQUIRED`, `ALTERNATIVE`, `CONDITIONAL`, `DISABLED`). Uma execution `ALTERNATIVE` só participa quando as demais alternativas não foram satisfeitas; não a confunda com fallback garantido.
+### Step 2 — Understand the selected flow
+Use `get_auth_flow` with the alias. Examine the order of executions and their requirements (`REQUIRED`, `ALTERNATIVE`, `CONDITIONAL`, `DISABLED`). An `ALTERNATIVE` execution only participates when the other alternatives were not satisfied; do not confuse it with a guaranteed fallback.
 
-### Step 3 — Configurar MFA
-Use required actions retornadas por `get_required_actions` para verificar `CONFIGURE_TOTP` e ações WebAuthn. Habilite uma política de OTP/WebAuthn, comunique o processo de enrolment e defina recovery (backup codes, help desk verificado ou credencial alternativa). Não obrigue MFA antes de validar o percurso de recuperação.
+### Step 3 — Configure MFA
+Use required actions returned by `get_required_actions` to check `CONFIGURE_TOTP` and WebAuthn actions. Enable an OTP/WebAuthn policy, communicate the enrollment process, and define recovery (backup codes, verified help desk, or alternative credential). Do not enforce MFA before validating the recovery path.
 
-### Step 4 — Criar flows customizados
-Copie um flow built-in, renomeie com propósito e ambiente claros, adicione conditionals e authenticators um por vez, e teste com conta de teste. Faça o binding somente após sucesso em login, logout, reset password e first login broker quando afetados.
+### Step 4 — Create custom flows
+Copy a built-in flow, rename it with a clear purpose and environment, add conditionals and authenticators one at a time, and test with a test account. Bind it only after success in login, logout, reset password, and first broker login when affected.
 
 ## References
-Consulte [built-in-flows.md](references/built-in-flows.md) para finalidade e cautelas dos flows fornecidos e [custom-flows-mfa.md](references/custom-flows-mfa.md) para um plano seguro de customização/MFA.
+See [built-in-flows.md](references/built-in-flows.md) for the purpose and cautions of the provided flows, and [custom-flows-mfa.md](references/custom-flows-mfa.md) for a safe customization/MFA plan.
 
 ## Important rules
-- **Antes de criar, copiar, configurar ou associar um flow, apresente o realm, flow, execução/binding, impacto e plano de recuperação; aguarde confirmação humana explícita.** Uma aprovação anterior, genérica ou para outro alvo não autoriza a alteração.
-- Não altere um flow built-in em produção; copie e mantenha uma rota de rollback.
-- Nunca desabilite ou torne opcional a validação de credenciais apenas para depurar uma integração.
-- MFA precisa de recuperação segura; sem ela, suporte manual vira um vetor de account takeover.
-- Use eventos (`get_realm_events`) e sessões (`get_user_sessions`) para investigar falhas depois da alteração.
+- **Before creating, copying, configuring, or binding a flow, present the realm, flow, execution/binding, impact, and recovery plan; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- Do not modify a built-in flow in production; copy it and keep a rollback route.
+- Never disable or make optional credential validation just to debug an integration.
+- MFA needs secure recovery; without it, manual support becomes an account-takeover vector.
+- Use events (`get_realm_events`) and sessions (`get_user_sessions`) to investigate failures after the change.
