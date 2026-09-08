@@ -5,10 +5,10 @@
   "description": "Comprehensive Keycloak identity and access management — manage realms, clients, users, roles, identity providers, organizations, authentication flows, protocol mappers, and debug JWT tokens via Admin REST API. Includes multi-tenant SaaS authorization patterns.",
   "author": {
     "name": "Lucas Magalhães",
-    "url": "https://github.com/lucasmagalhaes"
+    "url": "https://github.com/Lucas-magalhaes1"
   },
-  "homepage": "https://www.keycloak.org/docs",
-  "repository": "https://github.com/lucasmagalhaes/keycloak-power",
+  "homepage": "https://github.com/Lucas-magalhaes1/keycloak-power#readme",
+  "repository": "https://github.com/Lucas-magalhaes1/keycloak-power",
   "license": "Apache-2.0",
   "keywords": [
     "keycloak", "authentication", "authorization", "identity",

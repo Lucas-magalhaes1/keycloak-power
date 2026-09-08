@@ -124,6 +124,11 @@ npm run build
 
 The server speaks MCP over standard input/output. Do not write log messages to stdout; diagnostics belong on stderr. See [CONTRIBUTING.md](CONTRIBUTING.md) for development, security, and pull-request rules.
 
+## Privacy and support
+
+- Privacy policy: [PRIVACY.md](PRIVACY.md). This Power does not collect telemetry and only communicates with the `KEYCLOAK_URL` you configure.
+- Support and bug reports: open an issue at [github.com/Lucas-magalhaes1/keycloak-power/issues](https://github.com/Lucas-magalhaes1/keycloak-power/issues).
+
 ## Documentation sources
 
 The implementation follows the [Keycloak documentation](https://www.keycloak.org/documentation) and [Admin API reference](https://www.keycloak.org/docs-api/latest/rest-api/). Organization guidance follows Keycloak's [Organizations announcement](https://www.keycloak.org/2024/06/announcement-keycloak-organizations). Content was rephrased for compliance with licensing restrictions.
