@@ -27,7 +27,7 @@
 
 1. Build the server:
    ```powershell
-   Set-Location .\keycloak-power\mcp-server
+   Set-Location .\mcp-server
    npm ci
    npm run build
    ```
@@ -117,7 +117,7 @@ Quero um client para uma SPA. Use Authorization Code com PKCE, origens seguras e
 ## Development
 
 ```powershell
-Set-Location .\keycloak-power\mcp-server
+Set-Location .\mcp-server
 npm ci
 npm run build
 ```

@@ -8,7 +8,7 @@ Thank you for improving the Keycloak Power. Contributions should improve real Ke
 2. Use Node.js 22 or later.
 3. Install exact dependencies and compile:
    ```powershell
-   Set-Location .\keycloak-power\mcp-server
+   Set-Location .\mcp-server
    npm ci
    npm run build
    ```
