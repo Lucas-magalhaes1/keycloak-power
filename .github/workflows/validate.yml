@@ -1,0 +1,46 @@
+name: Validate Keycloak Power
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: keycloak-power/mcp-server/package-lock.json
+
+      - name: Validate plugin manifest against Agent Plugins schema
+        working-directory: keycloak-power
+        run: |
+          curl --fail --silent --show-error --location \
+            https://agent-plugins.org/schemas/1.0.0/plugin.schema.json \
+            --output /tmp/plugin.schema.json
+          npx --yes ajv-cli@5.0.0 validate --spec=draft2020 \
+            --strict=false -s /tmp/plugin.schema.json -d plugin.json
+
+      - name: Build MCP server
+        working-directory: keycloak-power/mcp-server
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify skill entry points
+        working-directory: keycloak-power
+        run: |
+          test -d skills
+          for skill in skills/*; do
+            test -d "$skill"
+            test -s "$skill/SKILL.md"
+          done

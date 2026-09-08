@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "keycloak-admin": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "env": {
+        "KEYCLOAK_URL": "${KEYCLOAK_URL}",
+        "KEYCLOAK_REALM": "${KEYCLOAK_REALM}",
+        "KEYCLOAK_CLIENT_ID": "${KEYCLOAK_CLIENT_ID}",
+        "KEYCLOAK_CLIENT_SECRET": "${KEYCLOAK_CLIENT_SECRET}"
+      }
+    }
+  }
+}

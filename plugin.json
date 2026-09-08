@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "keycloak",
+  "version": "1.0.0",
+  "description": "Comprehensive Keycloak identity and access management — manage realms, clients, users, roles, identity providers, organizations, authentication flows, protocol mappers, and debug JWT tokens via Admin REST API. Includes multi-tenant SaaS authorization patterns.",
+  "author": {
+    "name": "Lucas Magalhães",
+    "url": "https://github.com/lucasmagalhaes"
+  },
+  "homepage": "https://www.keycloak.org/docs",
+  "repository": "https://github.com/lucasmagalhaes/keycloak-power",
+  "license": "Apache-2.0",
+  "keywords": [
+    "keycloak", "authentication", "authorization", "identity",
+    "oidc", "openid-connect", "oauth", "oauth2", "saml",
+    "sso", "single-sign-on", "jwt", "token", "realm", "client",
+    "identity-provider", "idp", "federation", "ldap", "active-directory",
+    "multi-tenant", "organizations", "rbac", "roles", "groups",
+    "user-management", "access-control", "mfa", "two-factor",
+    "keycloak-admin", "entra-id", "okta", "protocol-mapper", "claims"
+  ]
+}
