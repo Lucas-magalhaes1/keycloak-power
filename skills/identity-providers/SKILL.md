@@ -27,7 +27,7 @@ Register Keycloak as a relying party/client at the provider and copy only the ne
 Use `create_identity_provider` with alias, `providerId`, displayName, and config. The provider IDs supported by the Power are `google`, `microsoft`, `oidc`, `saml`, and `keycloak-oidc`. Before saving, check that the endpoints/metadata belong to the correct tenant and that signature validation has not been disabled.
 
 ### Step 3 — Configure claim mappers
-Map stable identifiers and minimal attributes. Email is only a trustworthy identifier if it is verified and immutable under the provider's policy; prefer the external `sub`/subject for account linking. Configure the first-login flow to require confirmation or linking when needed.
+Before creating a broker mapper, call `get_identity_provider_mapper_types` for the exact alias: it returns the specific `identityProviderMapper` IDs and config properties this IdP instance actually supports. Provider IDs differ by IdP type; for example, `microsoft` uses `microsoft-user-attribute-mapper` with a `jsonField`/`userAttribute` pair (it reads the Microsoft Graph profile), while a generic `oidc` provider uses `oidc-user-attribute-idp-mapper` with `claim`/`user.attribute`. The username should be set with a `oidc-username-idp-mapper` (Username Template Importer), for example `template: "${CLAIM.preferred_username}"`, rather than by importing `preferred_username` as a plain attribute. `email`, `firstName`, and `lastName` are normally set directly by the broker on first login; use attribute importers mainly for additional attributes. Present the realm, alias, mapper name, provider ID, and config to the operator and wait for explicit human confirmation before calling `create_identity_provider_mapper`. Use `list_identity_provider_mappers` and `get_identity_provider_mapper` to verify, `update_identity_provider_mapper` to adjust config, and `delete_identity_provider_mapper` to remove a mapper that is no longer needed.
 
 ### Step 4 — Test authentication
 Use a test account, complete login at the IdP, and validate the user and session with `get_user`, `get_user_sessions`, and `get_realm_events`. Decode the local token issued by Keycloak with `decode_token`; the application should trust Keycloak's issuer, not the upstream token.
@@ -43,7 +43,9 @@ For B2B, create the Organization with `create_organization`, then use `add_idp_t
 - [Okta](references/okta-setup.md)
 
 ## Important rules
-- **Before creating, updating, linking, or removing an IdP, present realm, alias, issuer/metadata, changed fields, and login impact; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- **Before creating, updating, linking, or removing an IdP or a broker mapper, present realm, alias, issuer/metadata, changed fields, and login impact; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.
+- Never guess a broker mapper's `identityProviderMapper` ID or config keys; call `get_identity_provider_mapper_types` for the specific alias and provider first. The correct provider ID depends on the IdP's `providerId` (`microsoft`, `google`, `oidc`, `saml`, `keycloak-oidc`), not only on the protocol.
+- A broker mapper changes what is imported into the local Keycloak user on first login and subsequent syncs; it does not change what a client receives in a token. For token claims, use `protocol-mappers` on the client instead.
 - Never paste secrets, private keys, SAML assertions, or tokens into chat.
 - Validate issuer, discovery/metadata URL, signature, and audience; do not accept endpoints discovered from user input.
 - Use a stable alias; changing it breaks broker URLs and Organization associations.

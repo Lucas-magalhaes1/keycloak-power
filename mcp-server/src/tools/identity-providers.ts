@@ -77,5 +77,91 @@ export function identityProvidersTools(client: KeycloakClient): ToolDefinition[]
         return { deleted: true, alias };
       },
     },
+    {
+      name: "get_identity_provider_mapper_types",
+      description: "Get the broker mapper types this specific identity provider instance supports, each with its exact identityProviderMapper ID and config properties. Call this before creating a mapper instead of guessing a mapper ID.",
+      inputSchema: objectSchema({ realm: schema.string("Target realm name."), alias: schema.string("IdP alias.") }, ["realm", "alias"]),
+      handler: async (input) =>
+        client.get(client.realmPath(expectString(input, "realm"), `/identity-provider/instances/${encodeURIComponent(expectString(input, "alias"))}/mapper-types`)),
+    },
+    {
+      name: "list_identity_provider_mappers",
+      description: "List broker mappers (attribute importers, username template, role/group mappers) attached to an identity provider instance.",
+      inputSchema: objectSchema({ realm: schema.string("Target realm name."), alias: schema.string("IdP alias.") }, ["realm", "alias"]),
+      handler: async (input) =>
+        client.get(client.realmPath(expectString(input, "realm"), `/identity-provider/instances/${encodeURIComponent(expectString(input, "alias"))}/mappers`)),
+    },
+    {
+      name: "get_identity_provider_mapper",
+      description: "Get a single broker mapper of an identity provider instance by its internal mapper ID.",
+      inputSchema: objectSchema({
+        realm: schema.string("Target realm name."), alias: schema.string("IdP alias."), mapperId: schema.string("Internal mapper ID returned by list_identity_provider_mappers."),
+      }, ["realm", "alias", "mapperId"]),
+      handler: async (input) => {
+        const realm = expectString(input, "realm");
+        const alias = expectString(input, "alias");
+        const mapperId = expectString(input, "mapperId");
+        return client.get(client.realmPath(realm, `/identity-provider/instances/${encodeURIComponent(alias)}/mappers/${encodeURIComponent(mapperId)}`));
+      },
+    },
+    {
+      name: "create_identity_provider_mapper",
+      description: "Create a broker mapper on an identity provider instance to import a claim/attribute/JSON field into a Keycloak user attribute, username, role, or group during first login and subsequent syncs. Use get_identity_provider_mapper_types first to obtain the exact identityProviderMapper ID and config keys this IdP instance supports.",
+      inputSchema: objectSchema({
+        realm: schema.string("Target realm name."), alias: schema.string("IdP alias."),
+        name: schema.string("Display name for the mapper, unique within this IdP instance."),
+        identityProviderMapper: schema.string("Exact mapper provider ID from get_identity_provider_mapper_types, e.g. oidc-user-attribute-idp-mapper, microsoft-user-attribute-mapper, or oidc-username-idp-mapper."),
+        config: schema.object("Mapper configuration keyed by the property names from get_identity_provider_mapper_types, e.g. claim/jsonField, user.attribute/userAttribute, template, syncMode."),
+      }, ["realm", "alias", "name", "identityProviderMapper", "config"]),
+      handler: async (input) => {
+        const realm = expectString(input, "realm");
+        const alias = expectString(input, "alias");
+        const name = expectString(input, "name");
+        const identityProviderMapper = expectString(input, "identityProviderMapper");
+        const config = optionalObject(input, "config");
+        if (!config) throw new Error("config is required.");
+        const mappersPath = client.realmPath(realm, `/identity-provider/instances/${encodeURIComponent(alias)}/mappers`);
+        await client.post(mappersPath, { name, identityProviderAlias: alias, identityProviderMapper, config });
+        const mappers = await client.get<JsonObject[]>(mappersPath);
+        const created = mappers.find((mapper) => mapper.name === name);
+        return { created: true, mapper: created ?? { name, identityProviderAlias: alias, identityProviderMapper, config } };
+      },
+    },
+    {
+      name: "update_identity_provider_mapper",
+      description: "Merge configuration into an existing identity provider broker mapper by its internal mapper ID.",
+      inputSchema: objectSchema({
+        realm: schema.string("Target realm name."), alias: schema.string("IdP alias."),
+        mapperId: schema.string("Internal mapper ID returned by list_identity_provider_mappers."),
+        config: schema.object("Mapper configuration fields to update."),
+      }, ["realm", "alias", "mapperId", "config"]),
+      handler: async (input) => {
+        const realm = expectString(input, "realm");
+        const alias = expectString(input, "alias");
+        const mapperId = expectString(input, "mapperId");
+        const config = optionalObject(input, "config");
+        if (!config) throw new Error("config is required.");
+        const path = client.realmPath(realm, `/identity-provider/instances/${encodeURIComponent(alias)}/mappers/${encodeURIComponent(mapperId)}`);
+        const current = await client.get<JsonObject>(path);
+        const currentConfig = (current.config as JsonObject | undefined) ?? {};
+        await client.put(path, { ...current, config: { ...currentConfig, ...config } });
+        return { updated: true, mapper: await client.get(path) };
+      },
+    },
+    {
+      name: "delete_identity_provider_mapper",
+      description: "Delete a single broker mapper from an identity provider instance by its internal mapper ID. This is reversible by recreating the mapper.",
+      inputSchema: objectSchema({
+        realm: schema.string("Target realm name."), alias: schema.string("IdP alias."),
+        mapperId: schema.string("Internal mapper ID returned by list_identity_provider_mappers."),
+      }, ["realm", "alias", "mapperId"]),
+      handler: async (input) => {
+        const realm = expectString(input, "realm");
+        const alias = expectString(input, "alias");
+        const mapperId = expectString(input, "mapperId");
+        await client.delete(client.realmPath(realm, `/identity-provider/instances/${encodeURIComponent(alias)}/mappers/${encodeURIComponent(mapperId)}`));
+        return { deleted: true, mapperId };
+      },
+    },
   ];
 }

@@ -87,7 +87,7 @@ The Power manifest contains no secret. Use Kiro's environment/secrets configurat
 | Users | `list_users`, `get_user`, `create_user`, `update_user`, `assign_role_to_user`, `get_user_roles` |
 | Roles | `list_roles`, `create_role`, `get_role` |
 | Groups | `list_groups`, `create_group`, `add_user_to_group`, `get_group_members` |
-| Identity providers | `list_identity_providers`, `get_identity_provider`, `create_identity_provider`, `update_identity_provider`, `delete_identity_provider` |
+| Identity providers | `list_identity_providers`, `get_identity_provider`, `create_identity_provider`, `update_identity_provider`, `delete_identity_provider`, `get_identity_provider_mapper_types`, `list_identity_provider_mappers`, `get_identity_provider_mapper`, `create_identity_provider_mapper`, `update_identity_provider_mapper`, `delete_identity_provider_mapper` |
 | Organizations | `list_organizations`, `get_organization`, `create_organization`, `add_member_to_organization`, `list_organization_members`, `add_idp_to_organization` |
 | Authentication | `list_auth_flows`, `get_auth_flow`, `get_required_actions` |
 | Sessions and events | `get_user_sessions`, `get_server_info`, `get_realm_events` |
