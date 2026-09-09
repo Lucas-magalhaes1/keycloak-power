@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "keycloak",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Comprehensive Keycloak identity and access management — manage realms, clients, users, roles, identity providers, organizations, authentication flows, protocol mappers, and debug JWT tokens via Admin REST API. Includes multi-tenant SaaS authorization patterns.",
   "author": {
     "name": "Lucas Magalhães",
