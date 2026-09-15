@@ -1,0 +1,314 @@
+import { spawn } from "node:child_process";
+import {
+  KeycloakApiError,
+  KeycloakClient,
+  type JsonObject,
+  type ToolDefinition,
+  expectConfirmation,
+  expectString,
+  objectSchema,
+  optionalBoolean,
+  optionalStringArray,
+  redactSensitive,
+  schema,
+  stableJson,
+} from "../client.js";
+
+interface BffTarget {
+  realm: string;
+  clientId: string;
+  redirectUris: string[];
+  postLogoutRedirectUris: string[];
+  webOrigins: string[];
+}
+
+const bffManagedFields = [
+  "protocol",
+  "publicClient",
+  "standardFlowEnabled",
+  "implicitFlowEnabled",
+  "directAccessGrantsEnabled",
+  "serviceAccountsEnabled",
+  "clientAuthenticatorType",
+  "redirectUris",
+  "webOrigins",
+  "attributes.pkce.code.challenge.method",
+  "attributes.post.logout.redirect.uris",
+];
+
+export function bffTools(client: KeycloakClient): ToolDefinition[] {
+  return [
+    {
+      name: "plan_bff_client",
+      description: "Plan a secure confidential OIDC BFF client without mutating Keycloak or exposing a client secret.",
+      inputSchema: bffSchema(false),
+      handler: async (input) => {
+        const target = readBffTarget(input);
+        return planBffClient(client, target);
+      },
+    },
+    {
+      name: "create_bff_client",
+      description: "Create or reconcile a confidential Authorization Code + PKCE S256 BFF client. Requires target-bound confirmation; client secrets are delivered only to the configured vault sink, never returned to chat.",
+      inputSchema: objectSchema({
+        ...bffSchema(true).properties as JsonObject,
+        confirmation: schema.string("Must equal CREATE BFF CLIENT <realm>/<clientId> after human approval."),
+        secretRef: schema.string("Vault reference where the generated secret must be stored."),
+        rotateSecret: schema.boolean("Rotate the secret after reconciliation; defaults to false."),
+      }, ["realm", "clientId", "redirectUris", "postLogoutRedirectUris", "confirmation", "secretRef"]),
+      handler: async (input) => {
+        const target = readBffTarget(input);
+        expectConfirmation(input, `CREATE BFF CLIENT ${target.realm}/${target.clientId}`);
+        const secretRef = expectString(input, "secretRef");
+        const rotateSecret = optionalBoolean(input, "rotateSecret") ?? false;
+        const current = await findClient(client, target);
+        const desired = desiredClient(target);
+        const plan = buildPlan(target, current, desired);
+
+        if (!isConfiguredEnvironment("KEYCLOAK_SECRET_SINK_COMMAND")) {
+          throw new KeycloakApiError(412, "A secret sink is required before creating or rotating a BFF client. Configure KEYCLOAK_SECRET_SINK_COMMAND and retry; no secret is returned to chat.");
+        }
+
+        let clientUuid: string;
+        let status: "created" | "updated" | "unchanged" = "unchanged";
+        if (!current) {
+          await client.post(client.realmPath(target.realm, "/clients"), desired);
+          clientUuid = await client.resolveClientUUID(target.realm, target.clientId);
+          status = "created";
+        } else {
+          clientUuid = requireId(current, "Existing BFF client");
+          if (plan.status === "update") {
+            const path = client.realmPath(target.realm, `/clients/${encodeURIComponent(clientUuid)}`);
+            const currentAttributes = asObject(current.attributes);
+            await client.put(path, {
+              ...current,
+              ...desired,
+              id: clientUuid,
+              attributes: { ...currentAttributes, ...asObject(desired.attributes) },
+            });
+            status = "updated";
+          }
+        }
+
+        const secretWasDelivered = true;
+        if (secretWasDelivered) {
+          const secretPath = client.realmPath(target.realm, `/clients/${encodeURIComponent(clientUuid)}/client-secret`);
+          const credential = rotateSecret
+            ? await client.post<JsonObject>(secretPath)
+            : await client.get<JsonObject>(secretPath);
+          const secret = extractSecret(credential);
+          await deliverSecretToVault({ secretRef, secret, realm: target.realm, clientId: target.clientId });
+        }
+
+        const effective = await client.get<JsonObject>(client.realmPath(target.realm, `/clients/${encodeURIComponent(clientUuid)}`));
+        return {
+          status,
+          realm: target.realm,
+          clientId: target.clientId,
+          client: redactSensitive(effective),
+          changedFields: plan.changedFields,
+          secret: {
+            deliveredToVault: secretWasDelivered,
+            secretRef: secretWasDelivered ? secretRef : null,
+            value: null,
+          },
+        };
+      },
+    },
+    {
+      name: "validate_bff_client",
+      description: "Compare an existing client against the secure BFF baseline without mutating Keycloak or retrieving a secret.",
+      inputSchema: bffSchema(false),
+      handler: async (input) => {
+        const target = readBffTarget(input);
+        const current = await findClient(client, target);
+        const desired = desiredClient(target);
+        const plan = buildPlan(target, current, desired);
+        return {
+          valid: plan.status === "unchanged",
+          status: plan.status,
+          realm: target.realm,
+          clientId: target.clientId,
+          changedFields: plan.changedFields,
+          current: current ? redactSensitive(current) : null,
+          expected: redactSensitive(desired),
+        };
+      },
+    },
+  ];
+}
+
+function bffSchema(includeOrigins: boolean): JsonObject {
+  return objectSchema({
+    realm: schema.string("Target realm name."),
+    clientId: schema.string("Stable confidential BFF client ID."),
+    redirectUris: schema.strings("Exact HTTPS callback URIs; wildcards are not accepted."),
+    postLogoutRedirectUris: schema.strings("Exact HTTPS post-logout redirect URIs; wildcards are not accepted."),
+    ...(includeOrigins ? { webOrigins: schema.strings("Exact browser origins allowed for the BFF client; '*' is not accepted.") } : { webOrigins: schema.strings("Optional exact browser origins; '*' is not accepted.") }),
+  }, ["realm", "clientId", "redirectUris", "postLogoutRedirectUris"]);
+}
+
+function readBffTarget(input: JsonObject): BffTarget {
+  const realm = expectString(input, "realm");
+  const clientId = expectString(input, "clientId");
+  const redirectUris = requiredUriArray(input, "redirectUris", "redirect URI");
+  const postLogoutRedirectUris = requiredUriArray(input, "postLogoutRedirectUris", "post-logout redirect URI");
+  const webOrigins = (optionalStringArray(input, "webOrigins") ?? []).map((origin) => {
+    if (origin !== origin.trim() || origin.includes("*") || origin.endsWith("/")) throw new KeycloakApiError(400, "webOrigins must contain exact origins without whitespace, wildcards, or paths.");
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new KeycloakApiError(400, `Invalid web origin '${origin}'.`);
+    }
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash || parsed.username || parsed.password || (parsed.protocol !== "https:" && !isLocalhost(parsed.hostname))) {
+      throw new KeycloakApiError(400, `webOrigin '${origin}' must be an exact HTTPS origin without credentials.`);
+    }
+    return origin;
+  });
+  return { realm, clientId, redirectUris, postLogoutRedirectUris, webOrigins };
+}
+
+function requiredUriArray(input: JsonObject, key: string, label: string): string[] {
+  const values = optionalStringArray(input, key);
+  if (!values || values.length === 0) throw new KeycloakApiError(400, `'${key}' must contain at least one exact ${label}.`);
+  const unique = new Set<string>();
+  return values.map((value) => {
+    if (!value.trim() || value !== value.trim() || value.includes("*") || unique.has(value)) throw new KeycloakApiError(400, `'${key}' must contain unique exact URIs without whitespace or wildcards.`);
+    unique.add(value);
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new KeycloakApiError(400, `Invalid ${label} '${value}'.`);
+    }
+    if (parsed.hash || parsed.username || parsed.password || (parsed.protocol !== "https:" && !isLocalhost(parsed.hostname))) {
+      throw new KeycloakApiError(400, `${label} '${value}' must use HTTPS without fragments or embedded credentials outside localhost.`);
+    }
+    return value;
+  });
+}
+
+function desiredClient(target: BffTarget): JsonObject {
+  return {
+    clientId: target.clientId,
+    protocol: "openid-connect",
+    publicClient: false,
+    clientAuthenticatorType: "client-secret",
+    standardFlowEnabled: true,
+    implicitFlowEnabled: false,
+    directAccessGrantsEnabled: false,
+    serviceAccountsEnabled: false,
+    redirectUris: target.redirectUris,
+    webOrigins: target.webOrigins,
+    attributes: {
+      "pkce.code.challenge.method": "S256",
+      "post.logout.redirect.uris": target.postLogoutRedirectUris.join("##"),
+    },
+  };
+}
+
+async function planBffClient(client: KeycloakClient, target: BffTarget): Promise<JsonObject> {
+  const current = await findClient(client, target);
+  const desired = desiredClient(target);
+  const plan = buildPlan(target, current, desired);
+  return {
+    status: plan.status,
+    realm: target.realm,
+    clientId: target.clientId,
+    changedFields: plan.changedFields,
+    current: current ? redactSensitive(current) : null,
+    expected: redactSensitive(desired),
+    secret: { requiredOnCreate: true, storedExternally: true, value: null },
+  };
+}
+
+function buildPlan(target: BffTarget, current: JsonObject | undefined, desired: JsonObject): { status: "create" | "update" | "unchanged"; changedFields: string[] } {
+  if (!current) return { status: "create", changedFields: [...bffManagedFields] };
+  const currentAttributes = asObject(current.attributes);
+  const desiredAttributes = asObject(desired.attributes);
+  const values: Record<string, [unknown, unknown]> = {
+    protocol: [current.protocol, desired.protocol],
+    publicClient: [current.publicClient, desired.publicClient],
+    standardFlowEnabled: [current.standardFlowEnabled, desired.standardFlowEnabled],
+    implicitFlowEnabled: [current.implicitFlowEnabled, desired.implicitFlowEnabled],
+    directAccessGrantsEnabled: [current.directAccessGrantsEnabled, desired.directAccessGrantsEnabled],
+    serviceAccountsEnabled: [current.serviceAccountsEnabled, desired.serviceAccountsEnabled],
+    clientAuthenticatorType: [current.clientAuthenticatorType, desired.clientAuthenticatorType],
+    redirectUris: [sortedStrings(current.redirectUris), sortedStrings(desired.redirectUris)],
+    webOrigins: [sortedStrings(current.webOrigins), sortedStrings(desired.webOrigins)],
+    "attributes.pkce.code.challenge.method": [currentAttributes["pkce.code.challenge.method"], desiredAttributes["pkce.code.challenge.method"]],
+    "attributes.post.logout.redirect.uris": [postLogoutUris(currentAttributes["post.logout.redirect.uris"]), postLogoutUris(desiredAttributes["post.logout.redirect.uris"])],
+  };
+  const changedFields = Object.entries(values).filter(([, [actual, expected]]) => stableJson(actual) !== stableJson(expected)).map(([field]) => field);
+  return { status: changedFields.length === 0 ? "unchanged" : "update", changedFields };
+}
+
+async function findClient(client: KeycloakClient, target: BffTarget): Promise<JsonObject | undefined> {
+  const clients = await client.get<JsonObject[]>(client.realmPath(target.realm, "/clients"), { clientId: target.clientId, search: false });
+  return clients.find((candidate) => candidate.clientId === target.clientId);
+}
+
+function requireId(value: JsonObject, label: string): string {
+  if (typeof value.id !== "string" || !value.id) throw new KeycloakApiError(502, `${label} response did not contain an internal client UUID.`);
+  return value.id;
+}
+
+function extractSecret(credential: JsonObject): string {
+  for (const key of ["value", "secret"]) {
+    if (typeof credential[key] === "string" && credential[key]) return credential[key];
+  }
+  throw new KeycloakApiError(502, "Keycloak did not return a client secret to the configured vault sink.");
+}
+
+async function deliverSecretToVault(payload: { secretRef: string; secret: string; realm: string; clientId: string }): Promise<void> {
+  const command = process.env.KEYCLOAK_SECRET_SINK_COMMAND;
+  if (!command || isPlaceholder(command)) throw new KeycloakApiError(412, "KEYCLOAK_SECRET_SINK_COMMAND is required to deliver the client secret to a vault.");
+  const args = parseSinkArgs(process.env.KEYCLOAK_SECRET_SINK_ARGS);
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["pipe", "ignore", "ignore"] });
+    child.once("error", () => reject(new KeycloakApiError(502, "The configured secret vault sink could not be started.")));
+    child.once("close", (code) => code === 0
+      ? resolve()
+      : reject(new KeycloakApiError(502, "The configured secret vault sink rejected the client secret.")));
+    child.stdin.end(JSON.stringify({ type: "keycloak-client-secret", ...payload }));
+  });
+}
+
+function parseSinkArgs(value: string | undefined): string[] {
+  if (!value || isPlaceholder(value)) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) throw new Error("not an array of strings");
+    return parsed;
+  } catch {
+    throw new KeycloakApiError(500, "KEYCLOAK_SECRET_SINK_ARGS must be a JSON array of strings.");
+  }
+}
+
+function isConfiguredEnvironment(key: string): boolean {
+  const value = process.env[key];
+  return Boolean(value && !isPlaceholder(value));
+}
+
+function isPlaceholder(value: string): boolean {
+  return /^\$\{[^}]+\}$/.test(value.trim());
+}
+
+function asObject(value: unknown): JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as JsonObject : {};
+}
+
+function sortedStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").slice().sort() : [];
+}
+
+function postLogoutUris(value: unknown): string[] {
+  if (Array.isArray(value)) return sortedStrings(value);
+  if (typeof value !== "string") return [];
+  return value.split("##").map((item) => item.trim()).filter(Boolean).sort();
+}
+
+function isLocalhost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}

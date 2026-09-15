@@ -3,21 +3,27 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListResourcesRequestSchema, ListToolsRequestSchema, ReadResourceRequestSchema, } from "@modelcontextprotocol/sdk/types.js";
 import { KeycloakApiError, KeycloakClient, messageFrom } from "./client.js";
 import { authFlowsTools } from "./tools/auth-flows.js";
+import { baselineTools } from "./tools/baseline.js";
+import { bffTools } from "./tools/bff.js";
 import { clientsTools } from "./tools/clients.js";
 import { groupsTools } from "./tools/groups.js";
 import { identityProvidersTools } from "./tools/identity-providers.js";
+import { organizationGroupsTools } from "./tools/organization-groups.js";
 import { organizationsTools } from "./tools/organizations.js";
 import { protocolMappersTools } from "./tools/protocol-mappers.js";
 import { realmsTools } from "./tools/realms.js";
 import { rolesTools } from "./tools/roles.js";
+import { saasRolesTools } from "./tools/saas-roles.js";
 import { sessionsTools } from "./tools/sessions.js";
 import { tokensTools } from "./tools/tokens.js";
+import { userFederationTools } from "./tools/user-federation.js";
 import { usersTools } from "./tools/users.js";
 const client = new KeycloakClient();
 const tools = [
-    ...realmsTools(client), ...clientsTools(client), ...usersTools(client), ...rolesTools(client),
-    ...groupsTools(client), ...identityProvidersTools(client), ...organizationsTools(client),
-    ...authFlowsTools(client), ...sessionsTools(client), ...tokensTools(client), ...protocolMappersTools(client),
+    ...realmsTools(client), ...clientsTools(client), ...bffTools(client), ...usersTools(client), ...rolesTools(client),
+    ...saasRolesTools(client), ...groupsTools(client), ...organizationGroupsTools(client), ...identityProvidersTools(client),
+    ...userFederationTools(client), ...organizationsTools(client), ...authFlowsTools(client), ...sessionsTools(client),
+    ...tokensTools(client), ...protocolMappersTools(client), ...baselineTools(client),
 ];
 const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
 const server = new Server({ name: "keycloak-admin", version: "1.0.0" }, { capabilities: { tools: {}, resources: {} }, instructions: "Keycloak Admin REST API tools. Mutations require a least-privilege service account." });
@@ -95,21 +101,27 @@ function apiDocumentation() {
 }
 function groupToolsByDomain(allTools) {
     const domains = {
-        realms: [], clients: [], users: [], roles: [], groups: [], identityProviders: [], organizations: [],
+        realms: [], clients: [], bff: [], users: [], userFederation: [], roles: [], saasRoles: [],
+        groups: [], organizationGroups: [], identityProviders: [], organizations: [], baseline: [],
         authentication: [], sessionsAndEvents: [], tokens: [], protocolMappers: [],
     };
     for (const tool of allTools) {
-        const domain = tool.name.includes("realm") ? "realms"
-            : tool.name.includes("client") && !tool.name.includes("scope") ? "clients"
-                : tool.name.includes("user") ? "users"
-                    : tool.name.includes("role") ? "roles"
-                        : tool.name.includes("group") ? "groups"
-                            : tool.name.includes("identity_provider") || tool.name.includes("idp") ? "identityProviders"
-                                : tool.name.includes("organization") ? "organizations"
-                                    : tool.name.includes("auth_flow") || tool.name.includes("required_action") ? "authentication"
-                                        : tool.name.includes("session") || tool.name.includes("server_info") || tool.name.includes("event") ? "sessionsAndEvents"
-                                            : tool.name.includes("token") ? "tokens"
-                                                : "protocolMappers";
+        const domain = tool.name.includes("bff") ? "bff"
+            : tool.name.includes("baseline") ? "baseline"
+                : tool.name.includes("organization_group") ? "organizationGroups"
+                    : tool.name.includes("user_federation") ? "userFederation"
+                        : tool.name.includes("saas_") ? "saasRoles"
+                            : tool.name.includes("realm") ? "realms"
+                                : tool.name.includes("client") && !tool.name.includes("scope") ? "clients"
+                                    : tool.name.includes("user") ? "users"
+                                        : tool.name.includes("role") ? "roles"
+                                            : tool.name.includes("group") ? "groups"
+                                                : tool.name.includes("identity_provider") || tool.name.includes("idp") ? "identityProviders"
+                                                    : tool.name.includes("organization") ? "organizations"
+                                                        : tool.name.includes("auth_flow") || tool.name.includes("required_action") ? "authentication"
+                                                            : tool.name.includes("session") || tool.name.includes("server_info") || tool.name.includes("event") ? "sessionsAndEvents"
+                                                                : tool.name.includes("token") ? "tokens"
+                                                                    : "protocolMappers";
         domains[domain].push(tool.name);
     }
     return Object.entries(domains);

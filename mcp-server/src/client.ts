@@ -61,8 +61,8 @@ export class KeycloakClient {
     return this.request<T>("PUT", path, body, query);
   }
 
-  public async delete<T = unknown>(path: string, query?: QueryParameters): Promise<T> {
-    return this.request<T>("DELETE", path, undefined, query);
+  public async delete<T = unknown>(path: string, query?: QueryParameters, body?: unknown): Promise<T> {
+    return this.request<T>("DELETE", path, body, query);
   }
 
   public async resolveClientUUID(realm: string, clientId: string): Promise<string> {
@@ -254,6 +254,119 @@ export const schema = {
 
 export function messageFrom(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+export function expectConfirmation(input: JsonObject, expected: string): void {
+  const confirmation = expectString(input, "confirmation");
+  if (confirmation !== expected) {
+    throw new KeycloakApiError(400, `This operation requires target-bound confirmation exactly equal to '${expected}'.`);
+  }
+}
+
+export interface RedactionOptions {
+  redactInternalUrls?: boolean;
+  redactPii?: boolean;
+}
+
+/** Redacts secrets and optionally private URLs/PII before a value reaches MCP output. */
+export function redactSensitive(value: unknown, options: RedactionOptions = {}): unknown {
+  if (typeof value === "string" && options.redactInternalUrls && isInternalUrl(value)) return "[REDACTED_INTERNAL_URL]";
+  if (Array.isArray(value)) return value.map((item) => redactSensitive(item, options));
+  if (!isRecord(value)) return value;
+
+  const result: JsonObject = {};
+  for (const [key, item] of Object.entries(value)) {
+    const normalizedKey = normalizeKey(key);
+    if (isSensitiveKey(normalizedKey)) {
+      result[key] = "[REDACTED]";
+      continue;
+    }
+    if (options.redactPii && isPiiKey(normalizedKey)) {
+      result[key] = "[REDACTED_PII]";
+      continue;
+    }
+    if (options.redactInternalUrls && typeof item === "string" && isInternalUrl(item)) {
+      result[key] = "[REDACTED_INTERNAL_URL]";
+      continue;
+    }
+    result[key] = redactSensitive(item, options);
+  }
+  return result;
+}
+
+export function stableJson(value: unknown): string {
+  return JSON.stringify(sortJson(value));
+}
+
+export function extractServerVersion(serverInfo: unknown): string | undefined {
+  if (!isRecord(serverInfo)) return undefined;
+  for (const key of ["systemVersion", "version", "serverVersion"]) {
+    if (typeof serverInfo[key] === "string" && serverInfo[key].trim()) return serverInfo[key].trim();
+  }
+  return undefined;
+}
+
+export interface SemanticVersion {
+  major: number;
+  minor: number;
+  patch: number;
+  raw: string;
+}
+
+export function parseSemanticVersion(value: unknown): SemanticVersion | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = value.trim().match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!match) return undefined;
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3] ?? 0), raw: value.trim() };
+}
+
+export function versionAtLeast(actual: unknown, minimum: string): boolean {
+  const current = parseSemanticVersion(actual);
+  const required = parseSemanticVersion(minimum);
+  if (!current || !required) return false;
+  if (current.major !== required.major) return current.major > required.major;
+  if (current.minor !== required.minor) return current.minor > required.minor;
+  return current.patch >= required.patch;
+}
+
+function isRecord(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeKey(key: string): string {
+  return key.replace(/[._-]/g, "").toLowerCase();
+}
+
+function isSensitiveKey(key: string): boolean {
+  return key.includes("password") || key.includes("credential") || key.includes("secret") || key.includes("privatekey")
+    || key.includes("truststorepassword") || key.includes("keystorepassword") || key === "binddn"
+    || key === "bindcredential" || key === "usersdn" || key === "basedn" || key.includes("accesstoken")
+    || key.includes("refreshtoken");
+}
+
+function isPiiKey(key: string): boolean {
+  return key === "email" || key === "username" || key === "firstname" || key === "lastname"
+    || key === "givenname" || key === "familyname" || key === "phone" || key === "address"
+    || key === "ssn" || key === "socialsecuritynumber";
+}
+
+function isInternalUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (host === "localhost" || host === "::1" || host.endsWith(".local") || host.endsWith(".internal")) return true;
+    if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+    const private172 = host.match(/^172\.(\d+)\./);
+    return private172 ? Number(private172[1]) >= 16 && Number(private172[1]) <= 31 : !host.includes(".");
+  } catch {
+    return false;
+  }
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJson);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, sortJson(item)]));
 }
 
 function decodeBase64UrlJson(segment: string, label: string): JsonObject {

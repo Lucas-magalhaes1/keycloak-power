@@ -33,8 +33,8 @@ export class KeycloakClient {
     async put(path, body, query) {
         return this.request("PUT", path, body, query);
     }
-    async delete(path, query) {
-        return this.request("DELETE", path, undefined, query);
+    async delete(path, query, body) {
+        return this.request("DELETE", path, body, query);
     }
     async resolveClientUUID(realm, clientId) {
         const clients = await this.get(this.realmPath(realm, "/clients"), { clientId });
@@ -215,6 +215,109 @@ export const schema = {
 };
 export function messageFrom(error) {
     return error instanceof Error ? error.message : String(error);
+}
+export function expectConfirmation(input, expected) {
+    const confirmation = expectString(input, "confirmation");
+    if (confirmation !== expected) {
+        throw new KeycloakApiError(400, `This operation requires target-bound confirmation exactly equal to '${expected}'.`);
+    }
+}
+/** Redacts secrets and optionally private URLs/PII before a value reaches MCP output. */
+export function redactSensitive(value, options = {}) {
+    if (typeof value === "string" && options.redactInternalUrls && isInternalUrl(value))
+        return "[REDACTED_INTERNAL_URL]";
+    if (Array.isArray(value))
+        return value.map((item) => redactSensitive(item, options));
+    if (!isRecord(value))
+        return value;
+    const result = {};
+    for (const [key, item] of Object.entries(value)) {
+        const normalizedKey = normalizeKey(key);
+        if (isSensitiveKey(normalizedKey)) {
+            result[key] = "[REDACTED]";
+            continue;
+        }
+        if (options.redactPii && isPiiKey(normalizedKey)) {
+            result[key] = "[REDACTED_PII]";
+            continue;
+        }
+        if (options.redactInternalUrls && typeof item === "string" && isInternalUrl(item)) {
+            result[key] = "[REDACTED_INTERNAL_URL]";
+            continue;
+        }
+        result[key] = redactSensitive(item, options);
+    }
+    return result;
+}
+export function stableJson(value) {
+    return JSON.stringify(sortJson(value));
+}
+export function extractServerVersion(serverInfo) {
+    if (!isRecord(serverInfo))
+        return undefined;
+    for (const key of ["systemVersion", "version", "serverVersion"]) {
+        if (typeof serverInfo[key] === "string" && serverInfo[key].trim())
+            return serverInfo[key].trim();
+    }
+    return undefined;
+}
+export function parseSemanticVersion(value) {
+    if (typeof value !== "string")
+        return undefined;
+    const match = value.trim().match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+    if (!match)
+        return undefined;
+    return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3] ?? 0), raw: value.trim() };
+}
+export function versionAtLeast(actual, minimum) {
+    const current = parseSemanticVersion(actual);
+    const required = parseSemanticVersion(minimum);
+    if (!current || !required)
+        return false;
+    if (current.major !== required.major)
+        return current.major > required.major;
+    if (current.minor !== required.minor)
+        return current.minor > required.minor;
+    return current.patch >= required.patch;
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function normalizeKey(key) {
+    return key.replace(/[._-]/g, "").toLowerCase();
+}
+function isSensitiveKey(key) {
+    return key.includes("password") || key.includes("credential") || key.includes("secret") || key.includes("privatekey")
+        || key.includes("truststorepassword") || key.includes("keystorepassword") || key === "binddn"
+        || key === "bindcredential" || key === "usersdn" || key === "basedn" || key.includes("accesstoken")
+        || key.includes("refreshtoken");
+}
+function isPiiKey(key) {
+    return key === "email" || key === "username" || key === "firstname" || key === "lastname"
+        || key === "givenname" || key === "familyname" || key === "phone" || key === "address"
+        || key === "ssn" || key === "socialsecuritynumber";
+}
+function isInternalUrl(value) {
+    try {
+        const url = new URL(value);
+        const host = url.hostname.toLowerCase();
+        if (host === "localhost" || host === "::1" || host.endsWith(".local") || host.endsWith(".internal"))
+            return true;
+        if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host))
+            return true;
+        const private172 = host.match(/^172\.(\d+)\./);
+        return private172 ? Number(private172[1]) >= 16 && Number(private172[1]) <= 31 : !host.includes(".");
+    }
+    catch {
+        return false;
+    }
+}
+function sortJson(value) {
+    if (Array.isArray(value))
+        return value.map(sortJson);
+    if (!isRecord(value))
+        return value;
+    return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => [key, sortJson(item)]));
 }
 function decodeBase64UrlJson(segment, label) {
     try {

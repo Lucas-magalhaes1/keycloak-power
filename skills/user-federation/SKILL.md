@@ -2,7 +2,7 @@
 name: "user-federation"
 description: "Plan LDAP and Active Directory user federation in Keycloak. Use when corporate identities need to authenticate without an immediate credential migration."
 license: "Apache-2.0"
-compatibility: "Keycloak 21+; provider configuration is performed in the Keycloak Admin Console"
+compatibility: "Keycloak 21+; read/test adapters require an integration-tested target version and provider configuration is performed in the Keycloak Admin Console"
 metadata:
   author: "Lucas Magalhães"
   version: "1.0.0"
@@ -30,7 +30,7 @@ Map username to `sAMAccountName` (AD) or `uid` (LDAP), first name to `givenName`
 Use `READ_ONLY` if LDAP/AD is the source of truth; use `UNSYNCED` only when divergence is intentional and audited. Configure periodic full/changed-users sync according to volume and SLA. On import, define what happens to a user removed/disabled in the directory.
 
 ### Step 4 — Test sync and authentication
-Test connection, authentication of a test account, import, and attribute updates. Use `get_user` to inspect the Keycloak representation, `get_user_sessions` after login, and `get_realm_events` for bind/credential errors. See [ldap-ad-integration.md](references/ldap-ad-integration.md).
+For the MCP adapter, first run an integration test against the exact target Keycloak version and set `KEYCLOAK_USER_FEDERATION_TESTED_VERSION` to that version plus `KEYCLOAK_USER_FEDERATION_TEST_PATH` to the verified realm-relative Admin REST suffix. Then use `list_user_federation_providers`, `get_user_federation_provider`, and `list_user_federation_mappers`; outputs redact bind DN, credentials, internal URLs, and sensitive attributes. Use `test_user_federation_connection` only with provider, realm, base DN, impact, and target-bound confirmation. It accepts no bind password and reads the existing provider configuration server-side. Use `get_user` to inspect the Keycloak representation, `get_user_sessions` after login, and `get_realm_events` for bind/credential errors. See [ldap-ad-integration.md](references/ldap-ad-integration.md).
 
 ## Important rules
 - **Before creating, changing, testing, or syncing an LDAP/AD provider, present realm, provider, OU/base DN, sync mode, and impact on users; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.

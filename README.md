@@ -10,7 +10,8 @@
 
 - Administer realms, clients, users, roles, groups, sessions, events, and client scopes.
 - Configure OIDC, SAML, Google, Microsoft Entra ID, Okta, generic external IdPs, and LDAP/AD guidance.
-- Create and operate Keycloak Organizations for Keycloak 26+ multi-tenant B2B/B2B2C deployments.
+- Create and operate Keycloak Organizations for Keycloak 26+ multi-tenant B2B/B2B2C deployments; manage isolated Organization Groups on Keycloak 26.6+.
+- Provision secure BFF clients, fixed SaaS client roles, version-gated LDAP federation inspection, sanitized configuration baselines, and minimal token contracts.
 - Inspect JWT structure and claims locally without sending tokens to any service.
 - Design authentication flows, MFA, protocol mappers, and authorization middleware contracts.
 - Use focused skills that distinguish Keycloak authentication from SaaS-domain authorization.
@@ -18,7 +19,7 @@
 ## Requirements
 
 - Kiro IDE with custom Powers enabled.
-- Keycloak 21+ for core Admin REST API operations; Keycloak 26+ and Organizations enabled for organization tools.
+- Keycloak 21+ for core Admin REST API operations; Keycloak 26+ and Organizations enabled for organization tools; Keycloak 26.6+ for Organization Groups. The power returns `unsupported_feature` with the minimum upgrade for older servers.
 - A confidential client with **Service Accounts Enabled** and a client secret.
 - A service account granted the least-privilege `realm-management` roles required by the operations you intend to perform. The server uses only Client Credentials Grant; it never uses Resource Owner Password Credentials.
 - Node.js 22+ to run the bundled MCP server.
@@ -59,10 +60,18 @@
 | `KEYCLOAK_REALM` | Yes | Realm that authenticates the service account. |
 | `KEYCLOAK_CLIENT_ID` | Yes | Confidential client ID for the service account. |
 | `KEYCLOAK_CLIENT_SECRET` | Yes | Secret for Client Credentials Grant. |
+| `KEYCLOAK_SECRET_SINK_COMMAND` | For BFF create/rotation | Executable that receives a JSON secret record on stdin and stores it in the operator's vault. The secret is never written to MCP output. |
+| `KEYCLOAK_SECRET_SINK_ARGS` | No | JSON array of arguments passed to the secret sink executable. |
+| `KEYCLOAK_USER_FEDERATION_TESTED_VERSION` | For user-federation tools | Exact Keycloak version covered by an operator-run integration test. |
+| `KEYCLOAK_USER_FEDERATION_TEST_PATH` | For connection test | Exact, version-tested realm-relative Admin REST suffix for the LDAP connection test. No default is assumed. |
 
 The Power manifest contains no secret. Use Kiro's environment/secrets configuration or your operating system's environment to provide the values at runtime.
 
-## Skills
+### Secret delivery and version gates
+`create_bff_client` requires `KEYCLOAK_SECRET_SINK_COMMAND` whenever it creates, reconciles, or rotates a BFF client. It sends a JSON record containing `type`, `secretRef`, `realm`, `clientId`, and the secret through the sink process's stdin, ignores sink stdout/stderr, and returns only `{ deliveredToVault: true, secretRef }`. If Keycloak succeeds and the sink fails, rerun the same target without `rotateSecret`; the tool reads the current secret again and retries delivery without returning it to chat. Configure the command as a trusted local vault adapter; the MCP server does not implement a vendor-specific vault client or persist secrets.
+
+`list_user_federation_providers`, `get_user_federation_provider`, and `list_user_federation_mappers` require `KEYCLOAK_USER_FEDERATION_TESTED_VERSION` to exactly match the connected server. `test_user_federation_connection` additionally requires `KEYCLOAK_USER_FEDERATION_TEST_PATH`, set only after testing that realm-relative path against that exact Keycloak version. It never accepts a bind password in input.
+
 
 | Skill | Use it for |
 |---|---|
@@ -84,15 +93,20 @@ The Power manifest contains no secret. Use Kiro's environment/secrets configurat
 |---|---|
 | Realms | `list_realms`, `get_realm`, `create_realm`, `update_realm`, `delete_realm` (requires `confirmation: "DELETE <realm>"`; `master` is blocked) |
 | Clients | `list_clients`, `get_client`, `create_client`, `get_client_secret`, `update_client` |
+| BFF clients | `plan_bff_client`, `create_bff_client`, `validate_bff_client` (confidential Authorization Code + PKCE S256; secrets go only to the configured vault sink) |
 | Users | `list_users`, `get_user`, `create_user`, `update_user`, `assign_role_to_user`, `get_user_roles` |
 | Roles | `list_roles`, `create_role`, `get_role` |
+| SaaS roles | `plan_saas_default_roles`, `provision_saas_default_roles`, `assign_saas_client_role`, `remove_saas_client_role` (five fixed client roles only) |
 | Groups | `list_groups`, `create_group`, `add_user_to_group`, `get_group_members` |
+| Organization Groups | `get_organization_groups_capability`, `list_organization_groups`, `create_organization_group`, `move_organization_group`, `delete_organization_group`, `assign_organization_group_member` (Keycloak 26.6+ only; no realm-group fallback) |
 | Identity providers | `list_identity_providers`, `get_identity_provider`, `create_identity_provider`, `update_identity_provider`, `delete_identity_provider`, `get_identity_provider_mapper_types`, `list_identity_provider_mappers`, `get_identity_provider_mapper`, `create_identity_provider_mapper`, `update_identity_provider_mapper`, `delete_identity_provider_mapper` |
+| User federation | `list_user_federation_providers`, `get_user_federation_provider`, `list_user_federation_mappers`, `test_user_federation_connection` (version-matched integration gate; redacted output; no bind password input) |
 | Organizations | `list_organizations`, `get_organization`, `create_organization`, `add_member_to_organization`, `list_organization_members`, `add_idp_to_organization` |
 | Authentication | `list_auth_flows`, `get_auth_flow`, `get_required_actions` |
 | Sessions and events | `get_user_sessions`, `get_server_info`, `get_realm_events` |
 | Tokens | `decode_token`, `get_token_endpoint_info` |
 | Protocol mappers | `list_protocol_mappers`, `create_protocol_mapper`, `get_default_client_scopes` |
+| Baseline and token contract | `export_sanitized_baseline`, `diff_sanitized_baseline`, `validate_token_contract` |
 
 Tool inputs are validated for required strings and JSON-shaped configuration values. Every REST request surfaces Keycloak's HTTP status and message to make permissions, malformed request bodies, and unsupported server features diagnosable.
 

@@ -31,7 +31,7 @@ export declare class KeycloakClient {
     get<T = unknown>(path: string, query?: QueryParameters): Promise<T>;
     post<T = unknown>(path: string, body?: unknown, query?: QueryParameters): Promise<T>;
     put<T = unknown>(path: string, body?: unknown, query?: QueryParameters): Promise<T>;
-    delete<T = unknown>(path: string, query?: QueryParameters): Promise<T>;
+    delete<T = unknown>(path: string, query?: QueryParameters, body?: unknown): Promise<T>;
     resolveClientUUID(realm: string, clientId: string): Promise<string>;
     /** Resolves a Keycloak UUID directly or looks up an exact username. */
     resolveUser(realm: string, userIdOrUsername: string): Promise<string>;
@@ -59,5 +59,22 @@ export declare const schema: {
     object: (description: string) => JsonObject;
 };
 export declare function messageFrom(error: unknown): string;
+export declare function expectConfirmation(input: JsonObject, expected: string): void;
+export interface RedactionOptions {
+    redactInternalUrls?: boolean;
+    redactPii?: boolean;
+}
+/** Redacts secrets and optionally private URLs/PII before a value reaches MCP output. */
+export declare function redactSensitive(value: unknown, options?: RedactionOptions): unknown;
+export declare function stableJson(value: unknown): string;
+export declare function extractServerVersion(serverInfo: unknown): string | undefined;
+export interface SemanticVersion {
+    major: number;
+    minor: number;
+    patch: number;
+    raw: string;
+}
+export declare function parseSemanticVersion(value: unknown): SemanticVersion | undefined;
+export declare function versionAtLeast(actual: unknown, minimum: string): boolean;
 export {};
 //# sourceMappingURL=client.d.ts.map

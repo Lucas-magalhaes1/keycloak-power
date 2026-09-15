@@ -21,7 +21,7 @@ Keycloak proves identity and issues a JWT; the SaaS API makes the access decisio
 ## Step-by-step guide
 
 ### Step 1 — Configure claims in Keycloak
-Before creating or changing a mapper, present the change and its impact and get explicit human confirmation. Then use `list_protocol_mappers`, `create_protocol_mapper`, and `decode_token` to issue a stable identity (`sub`), email/username when needed, realm/client roles, and minimal context. Do not try to serialize every resource permission into the token.
+Before creating or changing a mapper, present the change and its impact and get explicit human confirmation. Then use `list_protocol_mappers`, `create_protocol_mapper`, and `decode_token` to issue a stable identity (`sub`), email/username when needed, realm/client roles, and minimal context. Use `plan_saas_default_roles` and confirmed `provision_saas_default_roles` only for the five coarse-grained client roles (`tenant-master`, `tenant-admin`, `manager`, `operator`, `viewer`). `assign_saas_client_role` and `remove_saas_client_role` require confirmation bound to realm/user/client/role. Do not create client roles for customer-specific roles; keep those in Control Tower membership and `role_permissions`. Do not try to serialize every resource permission into the token.
 
 ### Step 2 — Define Tenant/Account
 Model a Tenant/Account with types `INTERNAL`, `PARTNER`, and `CUSTOMER`, an immutable ID, and an owner. A user can have several Memberships (`user_id`, `tenant_id`, `role`). See [tenant-model.md](references/tenant-model.md).

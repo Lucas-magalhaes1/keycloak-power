@@ -11,6 +11,8 @@ metadata:
 # Keycloak Admin REST API
 
 ## Overview
+
+The MCP server also exposes `export_sanitized_baseline` and `diff_sanitized_baseline` for realm, clients, roles, flows, scopes, mappers, identity providers, and LDAP component drift without secrets or PII. `validate_token_contract` checks the minimal SaaS claim contract (`iss`, `sub`, `email`, optional `organization`) and rejects permission, relationship, active-tenant, and delegated-capability claims; it decodes locally and does not validate signatures.
 This skill operates the Admin REST API through the Power's MCP tools. The server authenticates exclusively with Client Credentials Grant; the identity is the service account of the configured client, so permissions and auditing must be planned before any mutation.
 
 ## Prerequisites checklist

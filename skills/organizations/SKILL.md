@@ -37,7 +37,7 @@ Create or find people with `create_user`/`get_user`, then call `add_member_to_or
 Create the IdP with `create_identity_provider`, verify it with `get_identity_provider`, and associate the alias via `add_idp_to_organization` after confirmation. Test the broker with an account from the IdP before enabling automatic discovery for real users.
 
 ### Step 6 — Configure Organization Groups
-Use Keycloak groups for identity cohorts when needed, for example `org/acme/admins`, but keep resource assignment and complex delegations in the SaaS database/policy. See [multi-tenant-patterns.md](references/multi-tenant-patterns.md).
+Organization Groups are available only from Keycloak 26.6.0. Call `get_organization_groups_capability` first; `list_organization_groups`, `create_organization_group`, `move_organization_group`, `delete_organization_group`, and `assign_organization_group_member` stop with `unsupported_feature` below that version and never fall back to realm groups. Every operation requires target-bound confirmation. Keep resource assignment and complex delegations in the SaaS database/policy. See [multi-tenant-patterns.md](references/multi-tenant-patterns.md).
 
 ## Important rules
 - **Before creating an Organization or changing domains, memberships, or linked IdPs, present realm, organization/alias, target resource, and impact; wait for explicit human confirmation.** A prior, generic confirmation, or one given for another target, does not authorize the change.

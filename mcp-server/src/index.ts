@@ -8,22 +8,28 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { KeycloakApiError, KeycloakClient, type JsonObject, type ToolDefinition, messageFrom } from "./client.js";
 import { authFlowsTools } from "./tools/auth-flows.js";
+import { baselineTools } from "./tools/baseline.js";
+import { bffTools } from "./tools/bff.js";
 import { clientsTools } from "./tools/clients.js";
 import { groupsTools } from "./tools/groups.js";
 import { identityProvidersTools } from "./tools/identity-providers.js";
+import { organizationGroupsTools } from "./tools/organization-groups.js";
 import { organizationsTools } from "./tools/organizations.js";
 import { protocolMappersTools } from "./tools/protocol-mappers.js";
 import { realmsTools } from "./tools/realms.js";
 import { rolesTools } from "./tools/roles.js";
+import { saasRolesTools } from "./tools/saas-roles.js";
 import { sessionsTools } from "./tools/sessions.js";
 import { tokensTools } from "./tools/tokens.js";
+import { userFederationTools } from "./tools/user-federation.js";
 import { usersTools } from "./tools/users.js";
 
 const client = new KeycloakClient();
 const tools = [
-  ...realmsTools(client), ...clientsTools(client), ...usersTools(client), ...rolesTools(client),
-  ...groupsTools(client), ...identityProvidersTools(client), ...organizationsTools(client),
-  ...authFlowsTools(client), ...sessionsTools(client), ...tokensTools(client), ...protocolMappersTools(client),
+  ...realmsTools(client), ...clientsTools(client), ...bffTools(client), ...usersTools(client), ...rolesTools(client),
+  ...saasRolesTools(client), ...groupsTools(client), ...organizationGroupsTools(client), ...identityProvidersTools(client),
+  ...userFederationTools(client), ...organizationsTools(client), ...authFlowsTools(client), ...sessionsTools(client),
+  ...tokensTools(client), ...protocolMappersTools(client), ...baselineTools(client),
 ];
 const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
 
@@ -111,11 +117,17 @@ function apiDocumentation(): JsonObject {
 
 function groupToolsByDomain(allTools: ToolDefinition[]): [string, string[]][] {
   const domains: Record<string, string[]> = {
-    realms: [], clients: [], users: [], roles: [], groups: [], identityProviders: [], organizations: [],
+    realms: [], clients: [], bff: [], users: [], userFederation: [], roles: [], saasRoles: [],
+    groups: [], organizationGroups: [], identityProviders: [], organizations: [], baseline: [],
     authentication: [], sessionsAndEvents: [], tokens: [], protocolMappers: [],
   };
   for (const tool of allTools) {
-    const domain = tool.name.includes("realm") ? "realms"
+    const domain = tool.name.includes("bff") ? "bff"
+      : tool.name.includes("baseline") ? "baseline"
+      : tool.name.includes("organization_group") ? "organizationGroups"
+      : tool.name.includes("user_federation") ? "userFederation"
+      : tool.name.includes("saas_") ? "saasRoles"
+      : tool.name.includes("realm") ? "realms"
       : tool.name.includes("client") && !tool.name.includes("scope") ? "clients"
       : tool.name.includes("user") ? "users"
       : tool.name.includes("role") ? "roles"
